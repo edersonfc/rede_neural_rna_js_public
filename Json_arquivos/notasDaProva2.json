@@ -1,0 +1,122 @@
+[
+    {
+      "horasEstudo": 10,
+      "horasSono": 7,
+      "tempoComputador": 3,
+      "tempoExercicios": 2,
+      "tempoLazer": 4,
+      "tempoCompras": 1,
+      "tempoLeitura": 1,
+      "tempoSocialMidia": 2,
+      "simuladoPorcentagem": 85,
+      "NotaProvaPorcentagem": 80
+    },
+    {
+      "horasEstudo": 15,
+      "horasSono": 6,
+      "tempoComputador": 2,
+      "tempoExercicios": 3,
+      "tempoLazer": 5,
+      "tempoCompras": 1,
+      "tempoLeitura": 1,
+      "tempoSocialMidia": 3,
+      "simuladoPorcentagem": 70,
+      "NotaProvaPorcentagem": 75
+    },
+    {
+      "horasEstudo": 8,
+      "horasSono": 8,
+      "tempoComputador": 4,
+      "tempoExercicios": 1,
+      "tempoLazer": 3,
+      "tempoCompras": 2,
+      "tempoLeitura": 1,
+      "tempoSocialMidia": 1,
+      "simuladoPorcentagem": 60,
+      "NotaProvaPorcentagem": 70
+    },
+    {
+      "horasEstudo": 20,
+      "horasSono": 5,
+      "tempoComputador": 5,
+      "tempoExercicios": 2,
+      "tempoLazer": 6,
+      "tempoCompras": 1,
+      "tempoLeitura": 1,
+      "tempoSocialMidia": 2,
+      "simuladoPorcentagem": 90,
+      "NotaProvaPorcentagem": 85
+    },
+    {
+      "horasEstudo": 12,
+      "horasSono": 6.5,
+      "tempoComputador": 3,
+      "tempoExercicios": 2,
+      "tempoLazer": 4,
+      "tempoCompras": 1,
+      "tempoLeitura": 1,
+      "tempoSocialMidia": 2,
+      "simuladoPorcentagem": 75,
+      "NotaProvaPorcentagem": 78
+    },
+    {
+      "horasEstudo": 18,
+      "horasSono": 7.5,
+      "tempoComputador": 4,
+      "tempoExercicios": 3,
+      "tempoLazer": 5,
+      "tempoCompras": 1,
+      "tempoLeitura": 1,
+      "tempoSocialMidia": 2,
+      "simuladoPorcentagem": 80,
+      "NotaProvaPorcentagem": 82
+    },
+    {
+      "horasEstudo": 25,
+      "horasSono": 6,
+      "tempoComputador": 6,
+      "tempoExercicios": 2,
+      "tempoLazer": 7,
+      "tempoCompras": 1,
+      "tempoLeitura": 1,
+      "tempoSocialMidia": 2,
+      "simuladoPorcentagem": 85,
+      "NotaProvaPorcentagem": 88
+    },
+    {
+      "horasEstudo": 9,
+      "horasSono": 9,
+      "tempoComputador": 2,
+      "tempoExercicios": 1,
+      "tempoLazer": 3,
+      "tempoCompras": 2,
+      "tempoLeitura": 1,
+      "tempoSocialMidia": 1,
+      "simuladoPorcentagem": 55,
+      "NotaProvaPorcentagem": 65
+    },
+    {
+      "horasEstudo": 16,
+      "horasSono": 7,
+      "tempoComputador": 3,
+      "tempoExercicios": 2,
+      "tempoLazer": 4,
+      "tempoCompras": 1,
+      "tempoLeitura": 1,
+      "tempoSocialMidia": 2,
+      "simuladoPorcentagem": 72,
+      "NotaProvaPorcentagem": 76
+    },
+    {
+      "horasEstudo": 23,
+      "horasSono": 6.5,
+      "tempoComputador": 5,
+      "tempoExercicios": 3,
+      "tempoLazer": 6,
+      "tempoCompras": 1,
+      "tempoLeitura": 1,
+      "tempoSocialMidia": 2,
+      "simuladoPorcentagem": 78,
+      "NotaProvaPorcentagem": 80
+    }
+  ]

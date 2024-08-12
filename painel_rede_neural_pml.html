@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="index.css">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
+
+    <title>Treinamento de Rede Neural</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+        }
+
+        .line {
+            position: absolute;
+            border-top: 2px solid black;
+            width: 100px;
+            background-color: orange;
+        }
+
+        .botao_remover {
+            cursor: pointer;
+            font-size: 15px;
+            background: #cf3535;
+            color: white;
+        }
+    </style>
+
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script src="funcoes_auxiliares.js"></script>
+    <script src="rna_pml_js_puro.js"></script>
+
+</head>
+
+
+<body style="background-color: #185380;">
+
+    <div id="containerDrawRNAeGrafico"
+        style="display: flex; flex-direction: row; width: 100%; height: 500px; background-color: transparent;">
+
+
+        <!-- Essa parte faz parte do desenho da rede RNA Abaixo -->
+        <div id="id_PrincipalContainerDrawRNA" style="width: 600px; background-color: #042944; border-radius: 10px; ">
+
+            <div style="display: flex; justify-content: center; align-items: center; height: 25px; color: white;">
+                <label>Montando Arquitetura da Rede Neural Perceptrom Multi-layer</label>
+            </div>
+
+            <div
+                style="display: flex;  flex-direction: row; width: 600px; height: 85px; background: #031B2D; justify-content: space-between; ">
+
+                <div
+                    style="display: flex;  flex-direction: row; gap:2px; margin: 5px; background-color: #042944; padding-right: 5px; border-radius:5px;">
+
+                    <div id="faixaBotoes" style="display: flex;  flex-direction: column; justify-content: top; align-items: center; padding-left: 5px; 
+            height: 60px;
+            /* background-image: linear-gradient(to right, #06163b, #031b2d);  */
+             border-radius:10px; border: solid linear-gradient(to right, white, #d3d3d3ef) 1px;  ">
+                        <label style="font-size: 13px; color:#d3d3d3ef;">Camada Entrada&nbsp;</label>
+                        <label style="font-size: 13px; color:#d3d3d3ef;">Qtde. Neuronios</label>
+                        <label id="entradaQtdeNeuronios" style="font-size: 25px; color:#abec43">1</label>
+                    </div>
+
+                    <div style=" display: flex; flex-direction: column; justify-content: center; height: 100%;">
+                        <button id="entradaQtdeNeuronioxRemover"
+                            style="height: 55px; border: solid 0px; border-radius: 5px; font-size: 15; color: white; cursor: pointer;"
+                            class="botaoSubtrair" onclick="adicionarOuRemoverNeuroniosCamadaDeEntrada('-')">-</button>
+                    </div>
+
+                    <div style=" display: flex; flex-direction: column; justify-content: center; height: 100%;">
+                        <button id="entradaQtdeNeuronioxAdicionar"
+                            style="height: 55px;  border: solid 0px; border-radius: 5px; font-size: 15; color: white; cursor: pointer;"
+                            class="botaoSomar" onclick="adicionarOuRemoverNeuroniosCamadaDeEntrada('+')">+</button>
+                    </div>
+                    <div style=" display: flex; flex-direction: column; justify-content: center; height: 100%;"></div>
+                </div>
+
+                <!-- &nbsp; -->
+
+
+                <div id="containerCamadaEscondidaGeral" style="display: flex; flex-direction: column; width: 280px; 
+                         padding-left: 5px; margin: 5px; background-color: #042944; border-radius:5px; ">
+
+                    <div id="faixaBotoesQtdeCamadasEscondida"
+                        style="display: flex; flex-direction: row; border: solid 0px; justify-content: center;">
+                        <label id="escondidaQtdeNeuroniox" style="color:#d3d3d3ef">Camadas Escondidas&nbsp;</label>
+
+                        <button id="escondidaQtdeNeuronioxRemover"
+                            style="border: solid 0px; border-radius: 4px; font-size: 15; color: white; cursor: pointer;"
+                            class="botaoSubtrair" onclick="criarComponentesDaCamadaEscondida('-')">-</button>
+                        &nbsp;
+                        <button id="escondidaQtdeNeuronioxAdicionar"
+                            style="border: solid 0px; border-radius: 4px; font-size: 15; color: white; cursor: pointer;"
+                            class="botaoSomar" onclick="criarComponentesDaCamadaEscondida('+')">+</button>
+
+                        <label id="qtdeCamadasEscondidasMostrador"
+                            style=" padding-top: 2px; font-weight: bolder; text-align: center; width: 20px; color:#abec43">1</label>
+                    </div>
+
+                    <!-- COMPONENTES DINAMICOS QUANTIDADE DE NEURÔNIOS ABAIXO -->
+                    <div id="containerCamadaEscondidaMostrador" style="display: flex; flex-direction: row; gap: 4px;"
+                        class="scroll-fino">
+
+                        <div id="camadaEscondidaMostrador0"
+                            style="width: 65px; display: flex; flex-direction: column; 
+                    background-image:linear-gradient(to right, #4623CB, #8531EC); margin: 5px; padding: 5px; border-radius: 5px;">
+
+                            <label style="text-align: center; font-size: 13px; color: white;">Neurônios</label>
+                            <div style="display: flex; flex-direction: row;">
+                                <button id="escondidaQtdeNeuronioxRemover0" class="botaoSubtrair2"
+                                    onclick="adicionarOuRemoverNeuroniosCamadaEscondida(this)">-</button>
+                                <button id="escondidaQtdeNeuronioxAdicionar0" class="botaoSomar2"
+                                    onclick="adicionarOuRemoverNeuroniosCamadaEscondida(this)">+</button>
+
+                                <label id="qtdeNeuronioCamadaEscondida0"
+                                    style="font-weight: bolder; text-align: center; width: 20px;">2</label>
+                            </div>
+                        </div>
+
+                    </div>
+                    <!-- COMPONENTES DINAMICOS QUANTIDADE DE NEURÔNIOS ACIMA -->
+
+                </div>
+
+                <!-- &nbsp; -->
+                <div
+                    style="display: flex;  flex-direction: row; gap:2px; margin: 5px; background-color: #042944; padding-right: 5px;  border-radius:5px;">
+                    <div id="faixaBotoesDeSaidas"
+                        style="display: flex;  flex-direction: column; justify-content: top; align-items: center; padding-left: 5px;">
+                        <label style="font-size: 13px; color: darkgray;">Camada Saída</label>
+                        <label style="font-size: 13px; color: darkgray;">Qtde. Neuronios</label>
+                        <label id="saidaQtdeNeuronios" style="font-size: 25px; color: #abec43;">1</label>
+                    </div>
+
+                    <div style=" display: flex; flex-direction: column; justify-content: center; height: 100%;">
+                        <button id="saidaQtdeNeuronioxRemover"
+                            style="height: 55px;  border: solid 0px; border-radius: 5px; font-size: 15; color: white; cursor: pointer;"
+                            class="botaoSubtrair" onclick="adicionarOuRemoverNeuroniosCamadaDeSaida('-')">-</button>
+                    </div>
+
+                    <div style=" display: flex; flex-direction: column; justify-content: center; height: 100%;">
+                        <button id="saidaQtdeNeuronioxAdicionar"
+                            style="height: 55px; border: solid 0px; border-radius: 5px; font-size: 15; color: white; cursor: pointer;"
+                            class="botaoSomar" onclick="adicionarOuRemoverNeuroniosCamadaDeSaida('+')">+</button>
+                    </div>
+                </div>
+
+            </div>
+
+            <div id="containerDrawRNA"
+                style="display: flex; flex-direction: row; justify-content: center; width: 600px; height: 280px; background-color: #031B2D;">
+
+                <div id="containerNeuroniosCamadaEntrada"
+                    style=" display: flex; flex-direction: column; justify-content: center ;  padding-top: 10px; padding-bottom: 10px; width: 70px;">
+                </div>
+
+                <div id="containerNeuroniosCamadaSaida"
+                    style=" display: flex; flex-direction: column; justify-content: center ;  padding-top: 10px; padding-bottom: 10px; width: 70px;">
+                </div>
+
+                <canvas id="meuCanvas" width="600px" height="280px" style="position: absolute;     
+                        /* border-top: 2px solid #021524; */
+                        /* box-shadow: 0 -2px 2px 0 rgba(0, 0, 0, 0.3); */
+                        border: solid transparent 0px;
+                ">
+                </canvas>
+
+            </div>
+
+            <button id="pintarNeuronio" style="visibility: show; margin-left: 5px;" class="botaoInidiarCss">Teste
+                Conexões</button>
+            <button id="limparCanvas" style="visibility: show;">Limpar Canvas</button>
+
+
+            <!-- HIPER-PARAMETROS ABAIXO -->
+            <br>
+            <div style="display: flex; flex-direction: column; align-items: center;">
+
+                <label style="text-align: center; height: 20px; font-size: 18px; color: gray;">Configuração dos
+                    Hyper-Parâmetros:</label>
+
+                <div
+                    style="display: flex; flex-direction: row; align-items: center; width:100%; justify-content: space-around; background: transparent; padding: 10px;">
+
+                    <div
+                        style="display: flex; flex-direction: column; align-items: center; color: white; width: 25%; gap: 5px;">
+                        <label style="text-align: center; font-size: 13px;">Taxa Aprendizagem:</label>
+                        <input id="id_taxaDeAprendizagem" value="0.000001"
+                            style="text-align: center;  width: 99%; font-size: 13px; font-weight: bold; color:#063298;">
+                    </div>
+
+                    <div
+                        style="display: flex; flex-direction: column; align-items: center; color: white; width: 25%; gap: 5px;">
+                        <label style="text-align: center; font-size: 13px;">Regulação Lambda:</label>
+                        <input id="id_regulacaoLambda" value="0.0001"
+                            style="text-align: center;  width: 99%;font-size: 13px; font-weight: bold; color:#063298">
+                    </div>
+
+                    <div
+                        style="display: flex; flex-direction: column; align-items: center; color: white; width: 25%; gap: 5px;">
+                        <label style="text-align: center; font-size: 13px;">Épocas Treinamento:</label>
+                        <input id="id_epocasDeTreinamento" value="100"
+                            style="text-align: center; width: 99%; font-size: 13px; font-weight: bold; color:#063298">
+                    </div>
+
+                    <div
+                        style="display: flex; flex-direction: column; align-items: center; color: white; width: 8%; gap: 5px;">
+                        <label style="text-align: center; color: transparent;">a</label>
+                        <button id="botaoIniciar" class="botaoInidiarCss">Iniciar</button>
+                    </div>
+
+                </div>
+
+
+                <br />
+
+            </div>
+            <!-- HIPER-PARAMETROS ACIMA -->
+
+
+            <div id="circuloTeste"
+                style=" visibility: hidden; position: absolute; width: 15px; ;height: 15px; border-radius: 50%; background-color: red; ">
+            </div>
+
+
+        </div>
+        <!-- Essa parte faz parte do desenho da rede RNA Acima -->
+
+        &nbsp;
+
+        <!-- Div resultados  e gráficos Abaixo -->
+        <div class="divResultadoEGraficos">
+
+            <!-- Div resultados saída da rede Abaixo -->
+
+            <div style="width: 100%; background: #031B2D; color:#d3d3d3ef; border-radius: 8px;">
+
+                <h2 style="width: 100%; height: 25px; text-align: center;">Saída da Rede Neural:</h2>
+
+                <div style="display: flex; flex-direction: row;">
+
+                    <div
+                        style="display: flex; flex-direction: column; align-items: center; width: 100%; background: #0c2b43;">
+                        <label>Resultado Real:</label>
+                        <label id="resultadoReal" style="text-align: center;">0</label>
+                    </div>
+
+                    <div
+                        style="display: flex; flex-direction: column; align-items: center; width: 100%; background: #0c2b43;">
+                        <label>Resultado Previsto:</label>
+                        <label id="resultadoPrevisto" style="text-align: center; ">0</label>
+                    </div>
+
+                    <div
+                        style="display: flex; flex-direction: column; align-items: center; width: 100%; background: #0c2b43;">
+                        <label>Erro Quadrático Médio:</label>
+                        <label id="erroQuadraticoMedio" style="text-align: center;">0</label>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- Div resultados saída da rede Acima -->
+                <!-- Gráfico Abaixo -->
+                <!-- <canvas class="divgraficos" id="meuCanvas"  ></canvas> -->
+                <div id="divGraficoVariosGraficos" style="display: flex; flex-direction: column; 
+            width: 98%; height: 100%;
+            overflow-y: scroll;
+            /* overflow-y: auto; */
+            overflow-x: hidden;
+            ">
+                    <div class="divgraficos" id="grafico0"></div>
+                    <!-- id_do_grafico_numero -->
+                </div>
+                <!-- Gráfico Acima -->
+
+        </div>
+        <!-- Div resultados  e gráficos Acima -->
+
+
+    </div>
+
+    <div id="id_div_segunda_linha" class="div_componente">
+        <div class="div_text_area">
+            <label for="pesosEntrada">Pesos de Entrada:</label>
+            <textarea id="pesosEntrada" class="textarea-componente"></textarea>
+        </div>
+
+        <div class="div_text_area">
+            <label for="pesosEscondidos">Pesos Escondidos:</label>
+            <textarea id="pesosEscondidos" class="textarea-componente"></textarea>
+        </div>
+
+        <div class="div_text_area">
+            <label for="pesosSaida">Pesos de Saída:</label>
+            <textarea id="pesosSaida" class="textarea-componente"></textarea>
+        </div>
+
+
+        <div id="id_divEntradaDeDadosPrincipalContainer" class="div_dados_de_entrada">
+
+            <div style="display: flex; flex-direction: row; justify-content:center; width: 100%;">
+                <div style="display: flex; flex-direction: row; justify-content:center; width: 15%;">
+                    <label id="id_show_and_hidden" class="iconCogsConfigEntradasDeDados"
+                        title="Configurar Entrada de Dados"
+                        onclick="mostrar_e_esconder_div_configuracao_entrada('block')"><i class="fa fa-cogs"
+                            aria-hidden="true"></i></label>
+                </div>
+                <div
+                    style="display: flex; flex-direction: row; justify-content:center; width: 85%; padding-right: 50px;">
+                    <label style="color: #00eeff;">Dados de Entrada</label>
+                </div>
+            </div>
+
+
+            <div id="id_div_dados_de_entrada_input" class="div_dados_de_entrada_input">
+                <label id="id_label_saida" style="color:#ffeb3b">Dados de Saída</label>
+            </div>
+
+
+        </div>
+
+    </div>
+
+    <div id="id_div_terceira_linha" class="div_componente2">
+        <br>
+        <label style="color: white;" for="pesosSaida"> &nbsp; &nbsp; Valores de Saída da Rede ao Final de Cada
+            Época:</label>
+        <textarea id="valoresDeSaidas" class="textarea-componente2"></textarea>
+    </div>
+
+
+    <div id="id_div_configuracao_entrada_de_dados" class="div_componente3" class="posicaoDivEntradaDeDados">
+        <br>
+
+        <div style="display: flex; flex-direction: row; justify-content:center; width: 100%;">
+            <div
+                style="display: flex; flex-direction: row; justify-content:flex-start; align-content: flex-start; width: 15%; margin: 0px;">
+                <label id="id_show_and_hidden" class="iconCogsConfigEntradasDeDadosNormalizado"
+                    title="Mostrar Dados Normalizados" onclick="toggleIconAndCallFunction(null)">
+                    <i id="icon_arrow" class="fa fa-arrow-left" aria-hidden="true"></i>
+                </label>
+            </div>
+            <div style="display: flex; flex-direction: row; justify-content:center; width: 85%; padding-right: 50px;">
+                <label style="color: #00eeff;">Entrada de Dados Configurações</label>
+            </div>
+        </div>
+
+
+        <div style="display: flex; flex-direction: row; justify-content: center; margin-top: 8px;">
+            <div class="configEntradaDeDados1">
+                <div class="configEntradaDeDados2">
+                    <label>Qtde. Chaves</label>
+                    <label id="idQtdeChaves">0</label>
+                </div>
+
+                <div class="configEntradaDeDados2">
+                    <label>Usar Só o 1º Índice</label>
+                    <button id="id_botaoUsarSoUmIndice"
+                        onclick="let text = this.textContent; this.textContent = text === 'Sim' ? 'Não' : 'Sim';"
+                        style="cursor: pointer;">Sim</button>
+                </div>
+
+
+                <div class="configEntradaDeDados2">
+                    <label>Qtde. Saída Rede</label>
+                    <input id="idQtdeSaidaRede" type="number" value="1" style="width: 40px; text-align: center;" />
+                </div>
+
+                <div class="configEntradaDeDados2">
+                    <label style="color: transparent;">A</label>
+                    <button id="idCarregarJson"
+                        style="text-align: center; font-size: x-small; height: 20px; cursor: pointer; ">Carregar
+                        JSON</button>
+                </div>
+
+            </div>
+        </div>
+
+        <div style="display: flex; flex-direction: row; width: 100%; justify-content: center; margin-top: 10px;">
+            <button id="id_aplicar_configuracoes" onclick="criandoElementoDeEntradaDeDados()"
+                class="aplicarConfigEntrada">Aplicar Configurações</button>
+        </div>
+
+        <!-- Array de objeto somente inicial mas pode ser carregado outros objetos de dados dinamicamente pela aplicação -->
+        <textarea id="idObjetoDeDadosDeEntrada" class="textarea-componente3">
+            [
+                {
+                    "horasEstudo": 57,
+                    "horasSono": 8,
+                    "simuladoPorcentagem": 91,
+                    "NotaProvaPorcentagem": 97
+                },
+                {
+                    "horasEstudo": 25,
+                    "horasSono": 5,
+                    "simuladoPorcentagem": 90,
+                    "NotaProvaPorcentagem": 75
+                },
+                {
+                    "horasEstudo": 15,
+                    "horasSono": 7,
+                    "simuladoPorcentagem": 85,
+                    "NotaProvaPorcentagem": 80
+                }
+            ]
+    </textarea>
+
+    </div>
+
+
+    <div id="id_div_configuracao_entrada_de_dados_normalizado" class="div_componente4">
+        <br>
+        <label onclick="document.getElementById('botaoIniciar').click()">&nbsp;&nbsp;&nbsp;&nbsp;Saída de Dados
+            Normalizados:</label>
+        <textarea id="idObjetoDeDadosDeEntradaNormalizado" class="textarea-componente4"></textarea>
+    </div>
+
+    <div id="fundoCaixaDeDialogBlackTranslucido_id" class="fundoCaixaDeDialogBlackTranslucido_css"> </div>
+
+    <script src="funcoes_principal_do_frontend.js"></script>
+
+</body>
+
+</html>

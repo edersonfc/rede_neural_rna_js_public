@@ -1,0 +1,26 @@
+[
+    {
+        "horasEstudo": 12,
+        "horasSono": 6,
+        "simuladoPorcentagem": 78,
+        "NotaProvaPorcentagem": 93
+    },
+    {
+        "horasEstudo": 22,
+        "horasSono": 6.5,
+        "simuladoPorcentagem": 24,
+        "NotaProvaPorcentagem": 68
+    },
+    {
+        "horasEstudo": 115,
+        "horasSono": 4,
+        "simuladoPorcentagem": 100,
+        "NotaProvaPorcentagem": 95
+    },
+    {
+        "horasEstudo": 31,
+        "horasSono": 9,
+        "simuladoPorcentagem": 67,
+        "NotaProvaPorcentagem": 75
+    }
+]
