@@ -2,7 +2,7 @@
 
 Este projeto é uma rede neural do tipo perceptron multi-layer feita totalmente em JavaScript, HTML e CSS, 
 - Com critérios didáticos de como funciona uma RN com os componentes básicos essenciais, 
-- Todo o motor princial de funcionamento da RN está no arquivo rna_pml_js_puro.js
+- Todo o motor princial de funcionamento da RN está no arquivo **rna_pml_js_puro.js**
 
 ![Painel de Rede Neural](https://github.com/edersonfc/rede_neural_rna_js_public/blob/main/images/painel_rede_neural.png)
 
