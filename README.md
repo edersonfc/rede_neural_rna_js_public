@@ -51,7 +51,7 @@ Modele a estrutura da rede neural com quantas camadas escondidas quiser e quanto
 1. Clone o repositório:
    ```bash
    git clone https://github.com/edersonfc/rede_neural_rna_js_public.git
-
+   ```
    <br>
 
 `Créditos` [www.linkedin.com/in/ederson-feliciano-corsatto](www.linkedin.com/in/ederson-feliciano-corsatto)
