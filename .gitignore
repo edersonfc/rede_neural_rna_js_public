@@ -1,0 +1,7 @@
+# Dependencias -- usadas SOMENTE pelos testes automatizados.
+# A aplicacao (painel, rede neural e animacao) nao depende de nada disso.
+node_modules/
+package-lock.json
+
+# Relatorio de cobertura gerado por "npm run test:cobertura"
+testes/cobertura/

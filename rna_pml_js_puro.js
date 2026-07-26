@@ -1,465 +1,743 @@
+/*
+ * ============================================================================
+ *  rna_pml_js_puro.js
+ * ----------------------------------------------------------------------------
+ *  ORQUESTRADOR do treinamento.
+ *
+ *  Este arquivo faz a ponte entre tres mundos:
+ *
+ *      PAINEL HTML  ->  este arquivo  ->  motor_rede_neural.js  (a matematica)
+ *                            |
+ *                            +--------->  animacao_rede_neural.js (o canvas)
+ *                            +--------->  graficos do Google (a curva)
+ *
+ *  Ele le a configuracao do painel, monta o conjunto de dados, cria a rede e
+ *  executa o treinamento UM PASSO DE CADA VEZ, de forma assincrona. E por isso
+ *  que a tela nao congela e que a animacao consegue mostrar, neuronio por
+ *  neuronio, o que a rede esta fazendo naquele instante exato.
+ *
+ *  JavaScript puro, sem nenhuma biblioteca.
+ * ============================================================================
+ */
+
+'use strict';
+
+/* ============================================================================
+ *  ESTADO GLOBAL DO TREINAMENTO
+ * ========================================================================= */
+
+// Mantido com o nome original por compatibilidade com o restante do painel.
+var dadosEntrada = [];
+
+var TreinamentoRedeNeural = {
+
+    // 'parado' | 'treinando' | 'pausado'
+    situacao: 'parado',
+
+    rede: null,
+    conjunto: null,
+    animador: null,
+
+    epocaAtual: 0,
+    amostraAtual: 0,
+    totalEpocas: 0,
+    totalAmostras: 0,
+
+    taxaDeAprendizagem: 0.1,
+    lambda: 0.0001,
+
+    atrasoEntrePassos: 40,
+    passosPorLote: 1,
+
+    identificadorTemporizador: null,
+    instanteUltimoGrafico: 0,
+
+    // Historico por amostra, ja na escala ORIGINAL dos dados.
+    historicoReais: [],
+    historicoPrevistos: [],
+    historicoErroGeral: [],
+
+    erroAcumuladoDaEpoca: 0
+};
 
 
-let dadosEntrada = [];
+/* ============================================================================
+ *  1) LEITURA DO PAINEL
+ * ========================================================================= */
+
+/**
+ * Le um campo do painel como numero, caindo no valor padrao se estiver vazio,
+ * invalido ou negativo quando nao pode ser.
+ */
+function lerNumeroDoCampo(identificador, valorPadrao, minimo, maximo) {
+    var elemento = document.getElementById(identificador);
+    if (!elemento) { return valorPadrao; }
+    var texto = (elemento.value !== undefined ? elemento.value : elemento.textContent);
+    var numero = parseFloat(String(texto).replace(',', '.'));
+    if (!Number.isFinite(numero)) { return valorPadrao; }
+    if (Number.isFinite(minimo) && numero < minimo) { return minimo; }
+    if (Number.isFinite(maximo) && numero > maximo) { return maximo; }
+    return numero;
+}
+
+function lerTextoDoCampo(identificador, valorPadrao) {
+    var elemento = document.getElementById(identificador);
+    if (!elemento) { return valorPadrao; }
+    return (elemento.value !== undefined && elemento.value !== '') ? elemento.value : valorPadrao;
+}
+
+/**
+ * Converte um texto em numero quando ele representa um numero; caso contrario
+ * devolve o proprio texto (que o motor transformara em categoria).
+ */
+function converterTextoEmValor(texto) {
+    var limpo = String(texto).trim();
+    if (limpo === '') { return 0; }
+    var numero = Number(limpo.replace(',', '.'));
+    return Number.isFinite(numero) ? numero : limpo;
+}
+
+/**
+ * Monta as amostras a partir dos campos de entrada do painel.
+ *
+ * Cada campo pode conter:
+ *   - um unico valor        -> "57"          -> 1 amostra
+ *   - varios separados por virgula -> "57,25,15" -> 3 amostras
+ *
+ * Campos com menos valores que o maior campo repetem o ultimo valor, em vez de
+ * gerarem "undefined" no meio dos dados (que era o que acontecia antes).
+ */
+function montarAmostrasAPartirDoPainel(identificadoresEntrada, identificadoresSaida) {
+
+    var todosOsIdentificadores = identificadoresEntrada.concat(identificadoresSaida);
+    var colunas = {};
+    var quantidadeDeAmostras = 1;
+
+    todosOsIdentificadores.forEach(function (identificador) {
+        var elemento = document.getElementById(identificador);
+        var bruto = elemento ? String(elemento.value) : '';
+        var partes = bruto.split(',').map(function (parte) { return parte.trim(); });
+        colunas[identificador] = partes;
+        if (partes.length > quantidadeDeAmostras) { quantidadeDeAmostras = partes.length; }
+    });
+
+    var amostras = [];
+    for (var i = 0; i < quantidadeDeAmostras; i++) {
+        var amostra = {};
+        todosOsIdentificadores.forEach(function (identificador) {
+            var partes = colunas[identificador];
+            var texto = (i < partes.length) ? partes[i] : partes[partes.length - 1];
+            amostra[identificador] = converterTextoEmValor(texto);
+        });
+        amostras.push(amostra);
+    }
+
+    return amostras;
+}
+
+/**
+ * Descobre quantos neuronios existem em cada camada escondida lendo os
+ * mostradores do painel.
+ */
+function lerArquiteturaDasCamadasEscondidas() {
+    var quantidades = [];
+    var indice = 0;
+    while (true) {
+        var mostrador = document.getElementById('qtdeNeuronioCamadaEscondida' + indice);
+        if (!mostrador) { break; }
+        var quantidade = parseInt(mostrador.textContent, 10);
+        quantidades.push(Number.isFinite(quantidade) && quantidade > 0 ? quantidade : 1);
+        indice++;
+    }
+    return quantidades.length > 0 ? quantidades : [2];
+}
 
 
+/* ============================================================================
+ *  2) FUNCAO PRINCIPAL - INICIA O TREINAMENTO
+ * ----------------------------------------------------------------------------
+ *  Assinatura mantida igual a original para nao quebrar quem ja chamava.
+ * ========================================================================= */
 function treinarRedeNeural(
-    arrayQuantitativosCamadasENeuroniosCamadaEscondidaPCodigoRNA
-    , arrayIdsIputsDeEntradaDadosParaTreinamentos
-    , arrayIdsIputsDeDadosDaSaidaReal
-    , chavesArray
+    arrayQuantitativosCamadasENeuroniosCamadaEscondidaPCodigoRNA,
+    arrayIdsIputsDeEntradaDadosParaTreinamentos,
+    arrayIdsIputsDeDadosDaSaidaReal,
+    chavesArray
 ) {
-
-    let array_para_o_grafico_valores_reais;
-    let array_para_o_grafico_valores_previstos;
-
-    let imprimeNoLabelValoresReais = [];
-    let imprimeNoLabelValoresPrevistos = [];
-
-    //Concatenando os 2 arrays de Input de Entrada e de Saída
-    const arrayInputsEntradaESaidaConcatenado = [...arrayIdsIputsDeEntradaDadosParaTreinamentos, ...arrayIdsIputsDeDadosDaSaidaReal];
 
     try {
 
-        let dadosTextoEValores = [];
-        let dadosSomenteValores = [];
-        let arrayQueVaiMontarOObjetoDeDados = [];
-        for (ww = 0; ww < arrayInputsEntradaESaidaConcatenado.length; ww++) {
-            arrayQueVaiMontarOObjetoDeDados.push(chavesArray[ww] + "|" + document.getElementById(arrayInputsEntradaESaidaConcatenado[ww]).value);
-            if (ww === (arrayInputsEntradaESaidaConcatenado.length - 1)) {
-                let arrayChaves = [];
-                let arrayValores = [];
-                for (let i = 0; i < arrayQueVaiMontarOObjetoDeDados.length; i++) {
-                    arrayChaves.push(arrayQueVaiMontarOObjetoDeDados[i].split('|')[0]);
-                    arrayValores.push(arrayQueVaiMontarOObjetoDeDados[i].split('|')[1]);
-                    if (i === (arrayQueVaiMontarOObjetoDeDados.length - 1)) {
-                        dadosEntrada = criarObjetosComChavesEValores(arrayChaves, arrayValores);
-                        // let aCopy = Object.assign({}, a);
-                        //Capturando Para mapeamento 1
-                        dadosTextoEValores.push(criarObjetosComChavesEValores(arrayChaves, arrayValores)[0]);
+        pararTreinamento();
 
-                        //ENVIANDO PARA NORMALIZAÇÃO DOS DADOS
-                        dadosEntrada = normalizarDadosParaARedeNeural(dadosEntrada);
+        var identificadoresEntrada = arrayIdsIputsDeEntradaDadosParaTreinamentos || [];
+        var identificadoresSaida = arrayIdsIputsDeDadosDaSaidaReal || [];
 
-                        if (dadosEntrada.length === 0) {
-
-                            //Capturando Para mapeamento 2
-                            dadosSomenteValores.push(normalizarDadosParaARedeNeural(dadosEntrada)[0]);
-                            //Enviando para o TextArea Objeto JSON com mapeamento de Valores
-                            document.getElementById('idObjetoDeDadosDeEntradaNormalizado').innerHTML =
-                                JSON.stringify(
-                                    criarMapeamentoDosDadosNormalizadoJSON(
-                                        dadosSomenteValores, dadosTextoEValores), null, 4
-                                );
-
-                        } else {
-
-                            try {
-                                let dadosSomenteValores = dadosEntrada;
-                                let dadosTextoEValores = document.getElementById('idObjetoDeDadosDeEntrada').value;
-                                //Enviando para o TextArea Objeto JSON com mapeamento de Valores
-                                document.getElementById('idObjetoDeDadosDeEntradaNormalizado').innerHTML =
-                                    JSON.stringify(
-                                        criarMapeamentoDosDadosNormalizadoJSON(
-                                            dadosSomenteValores, dadosTextoEValores), null, 4
-                                    );
-                            } catch (error) { alert("erro 76346 => " + error) }
-
-                        }//if else
-
-                    }//IF
-                }//FOR
-
-            }//IF
-
-            //DOING
-            if (ww === (arrayInputsEntradaESaidaConcatenado.length - 1)) {
-                array_para_o_grafico_valores_reais = criarMatrizMultiDimenssional(dadosEntrada.length);
-                array_para_o_grafico_valores_previstos = criarMatrizMultiDimenssional(dadosEntrada.length);
-            }//IF
-
-        }//FOR
-    } catch (error) { alert("erro 5328=> " + error) }
-
-    //-----MODELAGEM E DESIGN DA RN 
-    // 1 ENTRADA Camada Configurações dos Valores Abaixo
-    // Qtde Entradas Camada Entrada
-    const qtdeDadosDeEntradasNaCamadaDeEntrada = Object.keys(dadosEntrada[0]).length;
-
-    // Neurônios Camada de Entrada
-    const neuroniosCamadaDeEntrada_qtde = parseInt(document.getElementById('entradaQtdeNeuronios').innerHTML);
-
-    const neuroniosCamadaEscondida_qtde = arrayQuantitativosCamadasENeuroniosCamadaEscondidaPCodigoRNA;
-    var neuroniosCamadaEscondida_qtde2 = arrayQuantitativosCamadasENeuroniosCamadaEscondidaPCodigoRNA;
-
-    // 3 SAÍDA
-    // Neurônios Camada de Saída Camada Configurações dos Valores Abaixo
-    const neuroniosCamadaDeSaida_qtde = [parseInt(document.getElementById('saidaQtdeNeuronios').innerHTML)];
-    
-    //-----CONFIGURAÇÃO DOS HYPER PARÂMETROS
-    // Defina o número de épocas que você deseja treinar a rede
-    const numeroEpocas = parseInt(document.getElementById('id_epocasDeTreinamento').value);
-    //Defina a taxa de aprendizagem
-    // Defina a taxa de aprendizagem desejada (um valor pequeno, ex: 0.01)
-    const taxaDeAprendizagem = parseFloat(document.getElementById('id_taxaDeAprendizagem').value);
-    // Defina o valor do parâmetro de regularização (lambda)
-    const lambda = parseFloat(document.getElementById('id_regulacaoLambda').value);
-
-    //Array para Armazenamentos do Valores Reais e Previstos durante os Treinamentos
-    let array_dos_valores_previsto_em_cada_epoca = [];
-    let array_dos_valores_reais = [];
-
-    //Array dos Pesos Iniciais
-    let pesos_iniciais_entrada = [];
-    let pesos_iniciais_escondida = [];
-    let pesos_iniciais_saida = [];
-
-    // Inicialização glorot (Xavier) dos pesos
-    function inicializacaoGlorot(entrada, saida) {
-        const limite = Math.sqrt(6 / (entrada + saida));
-        return Math.random() * 2 * limite - limite;
-    }
-
-    // Gerando os pesos Iniciais Camada de Entrada
-    function gerandoPesosIniciaisParaEssaCamada(entradasQtde, neuroniosQtde) {
-        let array_pesos_iniciais = [];
-        for (let j = 1; j <= entradasQtde; j++) {
-            for (let k = 1; k <= neuroniosQtde; k++) {
-                array_pesos_iniciais.push(inicializacaoGlorot(j, k));
-            }
+        if (identificadoresEntrada.length === 0 || identificadoresSaida.length === 0) {
+            avisar('Configure ao menos uma coluna de entrada e uma de saida em "Configurar Entrada de Dados".');
+            return null;
         }
-        return array_pesos_iniciais;
-    }
 
-    //-----INICIALIZAÇÃO DOS PESOS DAS CAMADAS 
-    //Camada de Entrada
-    pesos_iniciais_entrada = gerandoPesosIniciaisParaEssaCamada(qtdeDadosDeEntradasNaCamadaDeEntrada, neuroniosCamadaDeEntrada_qtde);
+        // ---- 2.1 Dados -------------------------------------------------
+        var amostras = montarAmostrasAPartirDoPainel(identificadoresEntrada, identificadoresSaida);
+        var conjunto = MotorRedeNeural.prepararConjuntoDeDados(amostras, identificadoresEntrada, identificadoresSaida);
+        dadosEntrada = amostras;
 
-    //Camadas Escondidas
-    for (let i = 0; i < neuroniosCamadaEscondida_qtde.length; i++) {
-        if (i === 0) {
-            pesos_iniciais_escondida.push(gerandoPesosIniciaisParaEssaCamada((neuroniosCamadaDeEntrada_qtde * 1), neuroniosCamadaEscondida_qtde[i]));
-        } else {
-            pesos_iniciais_escondida.push(gerandoPesosIniciaisParaEssaCamada(neuroniosCamadaEscondida_qtde[(i - 1)], neuroniosCamadaEscondida_qtde[i]));
+        mostrarDadosNormalizados(conjunto);
+
+        // ---- 2.2 Arquitetura -------------------------------------------
+        var neuroniosCamadaEntrada = Math.max(1, parseInt(document.getElementById('entradaQtdeNeuronios').textContent, 10) || 1);
+        var camadasEscondidas = (arrayQuantitativosCamadasENeuroniosCamadaEscondidaPCodigoRNA &&
+            arrayQuantitativosCamadasENeuroniosCamadaEscondidaPCodigoRNA.length > 0)
+            ? arrayQuantitativosCamadasENeuroniosCamadaEscondidaPCodigoRNA.slice()
+            : lerArquiteturaDasCamadasEscondidas();
+
+        // A camada de saida DEVE ter exatamente um neuronio por coluna de saida.
+        // Antes isso podia divergir e o treinamento comparava vetores de tamanhos
+        // diferentes. Agora o painel e ajustado para bater com os dados.
+        var neuroniosCamadaSaida = identificadoresSaida.length;
+        var mostradorSaida = document.getElementById('saidaQtdeNeuronios');
+        if (mostradorSaida && parseInt(mostradorSaida.textContent, 10) !== neuroniosCamadaSaida) {
+            mostradorSaida.textContent = String(neuroniosCamadaSaida);
         }
-    }
 
-    //Camada de Saída 
-    pesos_iniciais_saida = gerandoPesosIniciaisParaEssaCamada(neuroniosCamadaEscondida_qtde.pop(), neuroniosCamadaDeSaida_qtde[0]);
+        // camadas = [dados brutos, camada de entrada, escondidas..., saida]
+        var camadas = [identificadoresEntrada.length, neuroniosCamadaEntrada]
+            .concat(camadasEscondidas)
+            .concat([neuroniosCamadaSaida]);
 
-    //-----CRIAÇÃO DAS CAMADAS QUE SÃO REPRESENTADAS POR FUNÇÕES
-    // CAMADAS DE ENTRADA DYNAMICAS
-    function camadaEntradaNeuronio(entradas, numeroNeuroniosCamadaEntrada, pesos) {
+        // ---- 2.3 Hiper-parametros --------------------------------------
+        var totalEpocas = Math.round(lerNumeroDoCampo('id_epocasDeTreinamento', 300, 1, 100000));
+        var taxaDeAprendizagem = lerNumeroDoCampo('id_taxaDeAprendizagem', 0.1, 0.0000001, 10);
+        var lambda = lerNumeroDoCampo('id_regulacaoLambda', 0.0001, 0, 10);
+        var ativacaoOculta = lerTextoDoCampo('id_funcaoAtivacaoOculta', 'sigmoide');
+        var ativacaoSaida = lerTextoDoCampo('id_funcaoAtivacaoSaida', 'linear');
 
-        let saidasCamadaEntrada = [];
-        for (let j = 0; j < numeroNeuroniosCamadaEntrada; j++) {
-            let somaPonderada = 0;
-            let startIndex = j * entradas.length; // Index inicial dos pesos para o neurônio j
-            for (let k = 0; k < entradas.length; k++) {
-                somaPonderada += entradas[k] * pesos[startIndex + k];
-            }
-            saidasCamadaEntrada.push(somaPonderada);
+        var rede = MotorRedeNeural.criarRede({
+            camadas: camadas,
+            ativacaoOculta: ativacaoOculta,
+            ativacaoSaida: ativacaoSaida,
+            semente: Date.now() & 0xffff
+        });
+
+        // ---- 2.4 Prepara o estado --------------------------------------
+        TreinamentoRedeNeural.rede = rede;
+        TreinamentoRedeNeural.conjunto = conjunto;
+        TreinamentoRedeNeural.totalEpocas = totalEpocas;
+        TreinamentoRedeNeural.totalAmostras = conjunto.entradas.length;
+        TreinamentoRedeNeural.taxaDeAprendizagem = taxaDeAprendizagem;
+        TreinamentoRedeNeural.lambda = lambda;
+        TreinamentoRedeNeural.epocaAtual = 0;
+        TreinamentoRedeNeural.amostraAtual = 0;
+        TreinamentoRedeNeural.erroAcumuladoDaEpoca = 0;
+        TreinamentoRedeNeural.historicoErroGeral = [];
+        TreinamentoRedeNeural.historicoReais = [];
+        TreinamentoRedeNeural.historicoPrevistos = [];
+        for (var a = 0; a < conjunto.entradas.length; a++) {
+            TreinamentoRedeNeural.historicoReais.push([]);
+            TreinamentoRedeNeural.historicoPrevistos.push([]);
         }
-        return saidasCamadaEntrada;
-    }
 
-    // CAMADAS ESCONDIDAS DYNAMICAS
-    function camadaEscondidaNeuronio(entradas, numeroNeuroniosCamadaEntrada, pesos) {
-        let saidasCamadaEscondida = [];
-        for (let j = 0; j < numeroNeuroniosCamadaEntrada; j++) {
-            let somaPonderada = 0;
-            let startIndex = j * entradas.length; // Index inicial dos pesos para o neurônio j
-            for (let k = 0; k < entradas.length; k++) {
-                somaPonderada += entradas[k] * pesos[startIndex + k];
-            }
-            saidasCamadaEscondida.push(somaPonderada);
+        aplicarVelocidadeDoPainel();
+        prepararGraficosParaAsAmostras(conjunto.entradas.length);
+
+        if (TreinamentoRedeNeural.animador) {
+            TreinamentoRedeNeural.animador.limpar();
+            TreinamentoRedeNeural.animador.atualizarGeometria();
+            TreinamentoRedeNeural.animador.emTreinamento = true;
+            TreinamentoRedeNeural.animador.iniciar();
         }
-        return saidasCamadaEscondida;
+
+        TreinamentoRedeNeural.situacao = 'treinando';
+        atualizarBotoesDeControle();
+        agendarProximoLote();
+
+        return TreinamentoRedeNeural;
+
+    } catch (erro) {
+        console.error('Falha ao iniciar o treinamento:', erro);
+        avisar('Nao foi possivel iniciar o treinamento.\n\n' + erro.message);
+        TreinamentoRedeNeural.situacao = 'parado';
+        atualizarBotoesDeControle();
+        return null;
     }
-
-    //CAMADA DE SAÍDA DINAMICAS
-    function camadaSaidaNeuronio(entradas, numeroNeuroniosCamadaEntrada, pesos) {
-        let saidasCamadaSaida = [];
-        for (let j = 0; j < numeroNeuroniosCamadaEntrada; j++) {
-            let somaPonderada = 0;
-            // Index inicial dos pesos para o neurônio j
-            let startIndex = j * entradas.length;
-            for (let k = 0; k < entradas.length; k++) {
-                somaPonderada += entradas[k] * pesos[startIndex + k];
-            }
-            saidasCamadaSaida.push(somaPonderada);
-        }
-        return saidasCamadaSaida;
-    }
-
-
-    // Função que Calcula o erro Meam Square Error (MSE) Abaixo
-    function calcularErroMSE(saidaReal, saidaPredita) {
-        // Verificar se há entradas válidas
-        if (saidaReal.length === 0 || saidaPredita.length === 0 || saidaReal.length !== saidaPredita.length) {
-            throw new Error('Entradas inválidas: as entradas devem ter o mesmo tamanho e não podem estar vazias.');
-        }
-        const n = saidaReal.length;
-        const somaQuadrados = saidaReal.reduce((soma, real, i) => {
-            const erro = real - saidaPredita[i];
-            return soma + erro * erro;
-        }, 0);
-
-        const mse = somaQuadrados / n;
-        // Verificar se o resultado é um número válido
-        if (Number.isFinite(mse)) {
-            return mse;
-        } else {
-            throw new Error('Erro no cálculo do MSE: resultado inválido.');
-        }
-    }
-
-    // Função para atualizar os pesos com Regularização L2 Abaixo
-    function atualizarPesosRegularizacaoL2(pesoAtual, gradiente, taxaDeAprendizagem, lambda) {
-        // Calcula o termo de regularização L2
-        const termoRegularizacao = lambda * pesoAtual;
-        // Atualiza o peso considerando o gradiente, a taxa de aprendizagem e a regularização L2
-        const novoPeso = pesoAtual - taxaDeAprendizagem * (gradiente + termoRegularizacao);
-        return novoPeso;
-    }
-
-    let resultado_real;
-    let resultado_previsto;
-    let erro_quadratico_medio;
-
-    const chaves = Object.keys(dadosEntrada[0]);
-
-    for (let indice_objeto_json = 0; indice_objeto_json < dadosEntrada.length; indice_objeto_json++) {
-        for (let epoca = 0; epoca < numeroEpocas; epoca++) {
-
-            setTimeout(function () {
-
-                let erroTotal = 0;
-                let entrada = dadosEntrada[indice_objeto_json];
-
-                const quantidade = parseInt(document.getElementById('idQtdeSaidaRede').value);
-                let saidaEsperada = obterUltimosValores(entrada, quantidade);
-                resultado_real = saidaEsperada;
-
-                // Executa a rede neural 
-                let entradasCamadaEntrada = [];
-                for (let chave of chaves.slice(0, qtdeDadosDeEntradasNaCamadaDeEntrada)) { entradasCamadaEntrada.push(entrada[chave]); }
-
-                //Calculos da Camada de Entrada
-                let saidaCamadaEntrada = camadaEntradaNeuronio(entradasCamadaEntrada, neuroniosCamadaDeEntrada_qtde, pesos_iniciais_entrada);
-
-                //Calculos da Camada Escondidas
-                let saidaCamadaEscondida = [];
-                for (let k = 0; k < neuroniosCamadaEscondida_qtde2.length; k++) {
-
-                    if (k === 0) {
-                        saidaCamadaEscondida = camadaEscondidaNeuronio(saidaCamadaEntrada, neuroniosCamadaEscondida_qtde2[k], pesos_iniciais_escondida[k]);
-                    }
-                    else {
-                        saidaCamadaEscondida = camadaEscondidaNeuronio(saidaCamadaEscondida, neuroniosCamadaEscondida_qtde2[k], pesos_iniciais_escondida[k]);
-                    }
-                }//FOR
-
-                //Calculos da Camada de Saída
-                let saidaCamadaSaida = camadaSaidaNeuronio(saidaCamadaEscondida, neuroniosCamadaDeSaida_qtde[0], pesos_iniciais_saida);
-                resultado_previsto = saidaCamadaSaida;
-
-                //Armazenando cada saída do final de cada época para fazer o gráfico
-                for (let ii = 0; ii < saidaCamadaSaida.length; ii++) {
-                    array_dos_valores_previsto_em_cada_epoca.push(saidaCamadaSaida[ii].toFixed(0));
-                    array_dos_valores_reais.push(saidaEsperada);
-                }
-
-                // Calcula o erro MSE (Mean Square Error)
-                saidaEsperada = transformaZeroParaUmEmArray(saidaEsperada)
-                saidaCamadaSaida = transformaZeroParaUmEmArray(saidaCamadaSaida)
-                let erro = calcularErroMSE([saidaEsperada], [saidaCamadaSaida]);
-                erroTotal += erro;
-                erro_quadratico_medio = erroTotal;
-
-
-                //----OBSERVAÇÃO IMPORTANTE BATER NESSE PONTO É O LUGAR QUE PODE GERAR ERROS
-                //AQUI IMPRIME OS PESOS DE TODAS AS CAMADAS SEPARADA POR ESSES 3 console.log()
-                // console.log(pesos_iniciais_entrada);
-                // console.log(pesos_iniciais_escondida);
-                // console.log(pesos_iniciais_saida);
-
-                // Atualiza os pesos da Camada de Entrada
-                let gradiente = saidaCamadaSaida - saidaEsperada;
-                let incrementoDaEntrada = 0;
-                for (let i = 0; i < pesos_iniciais_entrada.length; i++) {
-                    incrementoDaEntrada++;
-                    if (incrementoDaEntrada === (entradasCamadaEntrada.length)) { incrementoDaEntrada = 0; }
-                    //                                                        pesoAtual                , gradiente                                             , taxaDeAprendizagem, lambda
-                    pesos_iniciais_entrada[i] = atualizarPesosRegularizacaoL2(pesos_iniciais_entrada[i], gradiente * entradasCamadaEntrada[incrementoDaEntrada], taxaDeAprendizagem, lambda);
-                }
-
-                //Renderizando Pesos na Camada de Entrada
-                let imprimirPesoCamadaEntrada = "";
-                for (let q = 0; q < pesos_iniciais_entrada.length; q++) {
-                    let value = pesos_iniciais_entrada[q].toString().replace(/,/g, '') + "\n";
-                    value = value.replace(/,/g, '');
-                    imprimirPesoCamadaEntrada += value;
-                    document.getElementById('pesosEntrada').innerHTML = imprimirPesoCamadaEntrada;
-                }
-
-                // Atualiza os pesos das camadas escondida
-                let incrementoDaPonteiroCamadaEscondida = 0;
-                for (let i = 0; i < pesos_iniciais_escondida.length; i++) {
-                    let subarrayPesos = pesos_iniciais_escondida[i];
-                    for (let j = 0; j < subarrayPesos.length; j++) {
-                        if (incrementoDaPonteiroCamadaEscondida === (saidaCamadaEntrada.length)) { incrementoDaPonteiroCamadaEscondida = 0; }
-                        pesos_iniciais_escondida[i][j] = atualizarPesosRegularizacaoL2(pesos_iniciais_escondida[i][j], gradiente * saidaCamadaEntrada[incrementoDaPonteiroCamadaEscondida], taxaDeAprendizagem, lambda);
-                    }
-                }
-
-                //Renderizando Pesos nas Camada Escondida
-                let imprimirPesoCamadaEscondida = "";
-                for (let q = 0; q < pesos_iniciais_escondida.length; q++) {
-                    let subarrayPesos = pesos_iniciais_escondida[q];
-                    for (let r = 0; r < subarrayPesos.length; r++) {
-                        let value = pesos_iniciais_escondida[q][r].toString().replace(/,/g, '') + "\n";
-                        value = value.replace(/,/g, '');
-                        imprimirPesoCamadaEscondida += value;
-                        document.getElementById('pesosEscondidos').innerHTML = imprimirPesoCamadaEscondida;
-                    }
-                }
-
-                // Atualiza os pesos da Camada de Saída
-                let incrementoPonteiroCamadaSaida = 0;
-                for (let i = 0; i < pesos_iniciais_saida.length; i++) {
-                    incrementoPonteiroCamadaSaida++;
-                    if (incrementoPonteiroCamadaSaida === (saidaCamadaEscondida.length)) { incrementoPonteiroCamadaSaida = 0; }
-                    //                                                      pesoAtual              , gradiente                                                      , taxaDeAprendizagem, lambda
-                    pesos_iniciais_saida[i] = atualizarPesosRegularizacaoL2(pesos_iniciais_saida[i], gradiente * saidaCamadaEscondida[incrementoPonteiroCamadaSaida], taxaDeAprendizagem, lambda);
-                }
-
-                //Renderizando Pesos na Camada de Saída
-                let imprimirPesoCamadaSaida = "";
-                for (let q = 0; q < pesos_iniciais_saida.length; q++) {
-                    let value = pesos_iniciais_saida[q].toString().replace(/,/g, '') + "\n";
-                    value = value.replace(/,/g, '');
-                    imprimirPesoCamadaSaida += value;
-                    document.getElementById('pesosSaida').innerHTML = imprimirPesoCamadaSaida;
-                }
-
-                document.getElementById('resultadoReal').innerHTML = resultado_real;
-                document.getElementById('resultadoPrevisto').innerHTML = resultado_previsto;
-                document.getElementById('erroQuadraticoMedio').innerHTML = erro_quadratico_medio;
-                document.getElementById('valoresDeSaidas').innerHTML = array_dos_valores_previsto_em_cada_epoca;
-
-                if (dadosEntrada.length === 1) {
-                    desenharGrafico(array_dos_valores_reais, array_dos_valores_previsto_em_cada_epoca, "grafico0");
-                }//if
-
-                if (dadosEntrada.length > 1) {
-                    if (!document.getElementById('grafico' + indice_objeto_json)) {
-                        let divContainerMultiplosGraficos = document.getElementById('divGraficoVariosGraficos');
-                        let elementoGrafico0 = document.getElementById('grafico0');
-                        var alturaGrafico0 = elementoGrafico0.offsetHeight;
-                        let div = document.createElement("div");
-                        div.id = 'grafico' + indice_objeto_json;
-                        div.className = "divgraficos"
-                        div.style.height = alturaGrafico0 + "px";
-                        divContainerMultiplosGraficos.insertBefore(div, elementoGrafico0.nextSibling);
-
-                    }//IF
-
-                    array_para_o_grafico_valores_reais[indice_objeto_json].push(resultado_real);
-                    array_para_o_grafico_valores_previstos[indice_objeto_json].push(resultado_previsto);
-
-                    desenharGrafico(
-                        array_para_o_grafico_valores_reais[indice_objeto_json],
-                        array_para_o_grafico_valores_previstos[indice_objeto_json], "grafico" + indice_objeto_json
-                    );
-
-                    // Se for a última época, envia os dados para o gráfico e reseta o array
-                    if ((epoca + 1) % numeroEpocas === 0) {
-                        imprimeNoLabelValoresReais.push([array_para_o_grafico_valores_reais[indice_objeto_json]]);
-                        imprimeNoLabelValoresPrevistos.push([array_para_o_grafico_valores_previstos[indice_objeto_json]]);
-                        //DOING
-                        if (indice_objeto_json === (dadosEntrada.length - 1)) {
-                            let arrayParticionado = particionandoArrayUnicoEmVarios2(imprimeNoLabelValoresReais, dadosEntrada.length);
-                            let arrayParticionado2 = particionandoArrayUnicoEmVarios2(imprimeNoLabelValoresPrevistos, dadosEntrada.length);
-                            let arraysUltimosValoresReais = [];
-                            let arraysUltimosValoresPrevistos = [];
-                            for (let i = 0; i < arrayParticionado.length; i++) {
-
-                                arraysUltimosValoresReais.push(arrayParticionado[i].toString().split(",").slice(-1)[0]);
-                                arraysUltimosValoresPrevistos.push(parseFloat(arrayParticionado2[i].toString().split(",").slice(-1)[0]).toFixed(0));
-
-                                if (i === (arrayParticionado.length - 1)) {
-                                    document.getElementById('resultadoReal').innerHTML = arraysUltimosValoresReais;
-                                    document.getElementById('resultadoPrevisto').innerHTML = arraysUltimosValoresPrevistos;
-                                    document.getElementById('resultadoReal').textContent = substituirVirgulasPorBarrasVerticais(document.getElementById('resultadoReal'))
-                                    document.getElementById('resultadoPrevisto').textContent = substituirVirgulasPorBarrasVerticais(document.getElementById('resultadoPrevisto'))
-                                }//IF
-                            }//FOR
-                        }//IF
-                    }//IF
-
-                }//IF
-
-            }, epoca * 9);
-
-        }//FOR
-        document.getElementById('pintarNeuronio').click();
-    }//FOR
-
-
 }
 
-//Gerando o gráfico Abaixo usando a biblioteca do google
+
+/* ============================================================================
+ *  3) LACO ASSINCRONO DE TREINAMENTO
+ * ----------------------------------------------------------------------------
+ *  O laco NAO agenda todos os passos de uma vez (era o que a versao anterior
+ *  fazia com setTimeout dentro de dois "for", o que fazia epocas de amostras
+ *  diferentes dispararem no mesmo instante e embaralhava tudo).
+ *
+ *  Aqui existe um unico temporizador vivo por vez: ele executa um lote de
+ *  passos, devolve o controle ao navegador (para a tela respirar e a animacao
+ *  desenhar) e so entao agenda o proximo lote.
+ * ========================================================================= */
+
+function agendarProximoLote() {
+    if (TreinamentoRedeNeural.situacao !== 'treinando') { return; }
+    TreinamentoRedeNeural.identificadorTemporizador = setTimeout(
+        executarLoteDePassos,
+        TreinamentoRedeNeural.atrasoEntrePassos
+    );
+}
+
+function executarLoteDePassos() {
+
+    if (TreinamentoRedeNeural.situacao !== 'treinando') { return; }
+
+    var quantidade = Math.max(1, TreinamentoRedeNeural.passosPorLote);
+
+    for (var i = 0; i < quantidade; i++) {
+        if (!executarUmPasso()) { return; }
+    }
+
+    agendarProximoLote();
+}
+
+/**
+ * Executa UM passo de treinamento (uma amostra) e devolve false quando o
+ * treinamento inteiro terminou.
+ */
+function executarUmPasso() {
+
+    var estado = TreinamentoRedeNeural;
+    var conjunto = estado.conjunto;
+
+    var indiceAmostra = estado.amostraAtual;
+    var entradas = conjunto.entradas[indiceAmostra];
+    var alvos = conjunto.saidas[indiceAmostra];
+
+    var passo;
+    try {
+        passo = MotorRedeNeural.treinarUmPasso(estado.rede, entradas, alvos, estado.taxaDeAprendizagem, estado.lambda);
+    } catch (erro) {
+        console.error('Erro durante o passo de treinamento:', erro);
+        avisar('O treinamento foi interrompido: ' + erro.message);
+        pararTreinamento();
+        return false;
+    }
+
+    // Se os numeros explodiram, parar e explicar o motivo em vez de encher a
+    // tela de NaN sem dizer nada.
+    if (!Number.isFinite(passo.erro)) {
+        avisar('Os valores da rede explodiram (NaN/Infinito).\n\n' +
+            'Reduza a "Taxa Aprendizagem" e tente novamente.');
+        pararTreinamento();
+        return false;
+    }
+
+    estado.erroAcumuladoDaEpoca += passo.erro;
+
+    // ---- Alimenta a animacao com os numeros REAIS deste passo -----------
+    if (estado.animador) {
+        estado.animador.registrarPasso({
+            ativacoes: passo.ativacoes,
+            deltas: passo.deltas,
+            saida: passo.saida,
+            alvos: passo.alvos,
+            erro: passo.erro,
+            epoca: estado.epocaAtual + 1,
+            totalEpocas: estado.totalEpocas,
+            amostra: indiceAmostra + 1,
+            totalAmostras: estado.totalAmostras
+        });
+    }
+
+    // ---- Mostra os numeros no painel -----------------------------------
+    var previstoNaEscalaOriginal = MotorRedeNeural.desnormalizarSaidaDaRede(passo.saida, conjunto);
+    var realNaEscalaOriginal = conjunto.saidasOriginais[indiceAmostra];
+
+    atualizarPainelDeResultados(realNaEscalaOriginal, previstoNaEscalaOriginal, passo.erro);
+    atualizarTextoDosPesos(estado.rede);
+
+    estado.historicoReais[indiceAmostra].push(realNaEscalaOriginal[0]);
+    estado.historicoPrevistos[indiceAmostra].push(previstoNaEscalaOriginal[0]);
+
+    // ---- Avanca os contadores ------------------------------------------
+    estado.amostraAtual++;
+
+    if (estado.amostraAtual >= estado.totalAmostras) {
+        estado.amostraAtual = 0;
+        estado.epocaAtual++;
+
+        var erroMedioDaEpoca = estado.erroAcumuladoDaEpoca / estado.totalAmostras;
+        estado.historicoErroGeral.push(erroMedioDaEpoca);
+        estado.erroAcumuladoDaEpoca = 0;
+
+        atualizarTextoDeSaidasPorEpoca();
+        redesenharGraficos(false);
+
+        if (estado.epocaAtual >= estado.totalEpocas) {
+            concluirTreinamento();
+            return false;
+        }
+    }
+
+    redesenharGraficos(true);
+    return true;
+}
+
+function concluirTreinamento() {
+    TreinamentoRedeNeural.situacao = 'parado';
+    limparTemporizador();
+    redesenharGraficos(false);
+    if (TreinamentoRedeNeural.animador) {
+        TreinamentoRedeNeural.animador.encerrarTreinamento();
+    }
+    atualizarBotoesDeControle();
+    var elemento = document.getElementById('id_situacaoTreinamento');
+    if (elemento) {
+        var erroFinal = TreinamentoRedeNeural.historicoErroGeral.slice(-1)[0];
+        elemento.textContent = 'Treinamento concluido - erro final ' +
+            (Number.isFinite(erroFinal) ? erroFinal.toFixed(6) : '--');
+    }
+}
+
+
+/* ============================================================================
+ *  4) CONTROLES: PARAR, PAUSAR, RETOMAR, VELOCIDADE
+ * ========================================================================= */
+
+function limparTemporizador() {
+    if (TreinamentoRedeNeural.identificadorTemporizador !== null) {
+        clearTimeout(TreinamentoRedeNeural.identificadorTemporizador);
+        TreinamentoRedeNeural.identificadorTemporizador = null;
+    }
+}
+
+function pararTreinamento() {
+    limparTemporizador();
+    TreinamentoRedeNeural.situacao = 'parado';
+    if (TreinamentoRedeNeural.animador) {
+        TreinamentoRedeNeural.animador.encerrarTreinamento();
+    }
+    atualizarBotoesDeControle();
+}
+
+function pausarOuRetomarTreinamento() {
+    if (TreinamentoRedeNeural.situacao === 'treinando') {
+        limparTemporizador();
+        TreinamentoRedeNeural.situacao = 'pausado';
+    } else if (TreinamentoRedeNeural.situacao === 'pausado') {
+        TreinamentoRedeNeural.situacao = 'treinando';
+        agendarProximoLote();
+    }
+    atualizarBotoesDeControle();
+}
+
+/**
+ * Traduz a posicao do controle deslizante (1 = bem devagar, 100 = maximo) em
+ * atraso entre passos, tamanho do lote e duracao do ciclo da animacao.
+ *
+ * Na velocidade baixa da para acompanhar cada onda percorrendo a rede fio a
+ * fio; na velocidade alta o treino corre solto e a animacao mostra sempre o
+ * passo mais recente.
+ */
+function aplicarVelocidadeDoPainel() {
+
+    var velocidade = lerNumeroDoCampo('id_velocidadeTreinamento', 45, 1, 100);
+    var fracao = (velocidade - 1) / 99;
+
+    // Curva exponencial: 1400ms na ponta lenta, ~8ms na ponta rapida.
+    var atraso = Math.round(1400 * Math.pow(0.006, fracao));
+    var passosPorLote = velocidade > 85 ? Math.round(1 + (velocidade - 85) * 3) : 1;
+
+    TreinamentoRedeNeural.atrasoEntrePassos = Math.max(4, atraso);
+    TreinamentoRedeNeural.passosPorLote = passosPorLote;
+
+    if (TreinamentoRedeNeural.animador) {
+        // O ciclo da animacao acompanha o passo, com um minimo para nao virar
+        // um borrao ilegivel quando o treino esta muito rapido.
+        TreinamentoRedeNeural.animador.definirVelocidade(Math.max(280, Math.min(atraso, 2600)));
+    }
+
+    var rotulo = document.getElementById('id_rotuloVelocidade');
+    if (rotulo) {
+        rotulo.textContent = atraso >= 400 ? 'passo a passo' : (atraso >= 80 ? 'normal' : 'rapido');
+    }
+}
+
+function atualizarBotoesDeControle() {
+
+    var botaoIniciar = document.getElementById('botaoIniciar');
+    var botaoPausar = document.getElementById('id_botaoPausar');
+    var botaoParar = document.getElementById('id_botaoParar');
+    var situacao = document.getElementById('id_situacaoTreinamento');
+
+    var estaTreinando = TreinamentoRedeNeural.situacao === 'treinando';
+    var estaPausado = TreinamentoRedeNeural.situacao === 'pausado';
+
+    if (botaoIniciar) { botaoIniciar.textContent = (estaTreinando || estaPausado) ? 'Reiniciar' : 'Iniciar'; }
+    if (botaoPausar) {
+        botaoPausar.textContent = estaPausado ? 'Continuar' : 'Pausar';
+        botaoPausar.disabled = !(estaTreinando || estaPausado);
+    }
+    if (botaoParar) { botaoParar.disabled = !(estaTreinando || estaPausado); }
+
+    if (situacao && (estaTreinando || estaPausado)) {
+        situacao.textContent = estaPausado
+            ? 'Pausado na epoca ' + TreinamentoRedeNeural.epocaAtual
+            : 'Treinando... epoca ' + (TreinamentoRedeNeural.epocaAtual + 1) + '/' + TreinamentoRedeNeural.totalEpocas;
+    }
+}
+
+
+/* ============================================================================
+ *  5) SAIDA NA TELA (textareas e labels)
+ * ========================================================================= */
+
+function definirValorDoCampo(identificador, texto) {
+    var elemento = document.getElementById(identificador);
+    if (!elemento) { return; }
+    // Em <textarea> o correto e mexer em .value. Usar .innerHTML deixava o
+    // conteudo visivel dessincronizado do conteudo real do campo.
+    if (elemento.value !== undefined) {
+        elemento.value = texto;
+    } else {
+        elemento.textContent = texto;
+    }
+}
+
+function formatarLista(valores, casasDecimais) {
+    return valores.map(function (valor) {
+        return Number.isFinite(valor) ? valor.toFixed(casasDecimais) : String(valor);
+    }).join(' | ');
+}
+
+function atualizarPainelDeResultados(reais, previstos, erro) {
+    var real = document.getElementById('resultadoReal');
+    var previsto = document.getElementById('resultadoPrevisto');
+    var mse = document.getElementById('erroQuadraticoMedio');
+    if (real) { real.textContent = formatarLista(reais, 2); }
+    if (previsto) { previsto.textContent = formatarLista(previstos, 2); }
+    if (mse) { mse.textContent = erro.toFixed(6); }
+}
+
+/**
+ * Escreve os pesos de cada bloco nas tres caixas de texto do painel.
+ * A caixa "Pesos Escondidos" mostra todos os blocos intermediarios.
+ */
+function atualizarTextoDosPesos(rede) {
+
+    if (!rede || !rede.pesos.length) { return; }
+
+    var ultimoBloco = rede.pesos.length - 1;
+
+    definirValorDoCampo('pesosEntrada', formatarBlocoDePesos(rede.pesos[0], rede.vieses[0]));
+
+    var textoEscondidos = '';
+    for (var bloco = 1; bloco < ultimoBloco; bloco++) {
+        textoEscondidos += '--- camada ' + bloco + ' ---\n';
+        textoEscondidos += formatarBlocoDePesos(rede.pesos[bloco], rede.vieses[bloco]) + '\n';
+    }
+    if (textoEscondidos === '') { textoEscondidos = '(rede sem bloco escondido intermediario)'; }
+    definirValorDoCampo('pesosEscondidos', textoEscondidos);
+
+    if (ultimoBloco > 0) {
+        definirValorDoCampo('pesosSaida', formatarBlocoDePesos(rede.pesos[ultimoBloco], rede.vieses[ultimoBloco]));
+    }
+}
+
+function formatarBlocoDePesos(matriz, vieses) {
+    var linhas = [];
+    for (var destino = 0; destino < matriz.length; destino++) {
+        var pesosFormatados = matriz[destino].map(function (peso) {
+            return (peso >= 0 ? ' ' : '') + peso.toFixed(6);
+        }).join('  ');
+        linhas.push('n' + destino + ': ' + pesosFormatados + '   [vies ' + vieses[destino].toFixed(6) + ']');
+    }
+    return linhas.join('\n');
+}
+
+function atualizarTextoDeSaidasPorEpoca() {
+    var estado = TreinamentoRedeNeural;
+    var linhas = [];
+    for (var amostra = 0; amostra < estado.historicoPrevistos.length; amostra++) {
+        var previstos = estado.historicoPrevistos[amostra];
+        var real = estado.historicoReais[amostra][0];
+        linhas.push('Amostra ' + (amostra + 1) +
+            ' | real: ' + (Number.isFinite(real) ? real.toFixed(2) : real) +
+            ' | previsto por epoca: ' + previstos.map(function (v) { return v.toFixed(2); }).join(', '));
+    }
+    definirValorDoCampo('valoresDeSaidas', linhas.join('\n'));
+}
+
+function mostrarDadosNormalizados(conjunto) {
+    var linhas = conjunto.entradas.map(function (entrada, indice) {
+        var objeto = {};
+        conjunto.chavesEntrada.forEach(function (chave, i) { objeto[chave] = Number(entrada[i].toFixed(4)); });
+        conjunto.chavesSaida.forEach(function (chave, i) { objeto[chave] = Number(conjunto.saidas[indice][i].toFixed(4)); });
+        return objeto;
+    });
+    definirValorDoCampo('idObjetoDeDadosDeEntradaNormalizado', JSON.stringify({
+        observacao: 'Valores reescalados para a faixa 0..1 (min-max) antes de entrar na rede.',
+        minimosEMaximos: conjunto.estatisticas,
+        categoriasDeTexto: conjunto.mapeamentos,
+        amostrasNormalizadas: linhas
+    }, null, 4));
+}
+
+function avisar(mensagem) {
+    var elemento = document.getElementById('id_situacaoTreinamento');
+    if (elemento) { elemento.textContent = mensagem.split('\n')[0]; }
+    if (typeof alert === 'function') { alert(mensagem); }
+}
+
+
+/* ============================================================================
+ *  6) GRAFICOS (biblioteca do Google)
+ * ----------------------------------------------------------------------------
+ *  Todas as chamadas sao protegidas: se a pagina for aberta sem internet, a
+ *  biblioteca do Google nao carrega e o painel precisa continuar funcionando
+ *  (antes, isso derrubava o treinamento inteiro com um erro).
+ * ========================================================================= */
+
+var graficoDisponivel = false;
+
 function inicializarGrafico() {
-    google.charts.load('current', { 'packages': ['corechart'] });
-    google.charts.setOnLoadCallback(desenharGrafico);
-}
-
-function desenharGrafico(array_dos_valores_reais, array_dos_valores_previsto_em_cada_epoca, idGrafico) {
-    if (array_dos_valores_reais) {
-        const dados = [['Época', 'Valores Previstos', 'Valores Reais']];
-        for (let i = 0; i < array_dos_valores_previsto_em_cada_epoca.length; i++) {
-            dados.push([
-                i,
-                parseFloat(array_dos_valores_previsto_em_cada_epoca[i]),
-                parseFloat(array_dos_valores_reais[i])
-            ]);
-        }
-        const data = google.visualization.arrayToDataTable(dados);
-        const options = {
-            title: 'Gráfico de Aprendizagem',
-            curveType: 'function',
-            legend: { position: 'bottom' },
-            hAxis: { title: 'Época' },
-            vAxis: { title: 'Valor' }
-        };
-        const chart = new google.visualization.LineChart(document.getElementById(idGrafico));
-        chart.draw(data, options);
-    }//IF
-}
-
-
-function desenharGrafico2(array_dos_valores_reais, array_dos_valores_previsto_em_cada_epoca) {
-    const dados = [['Época', 'Valores Previstos', 'Valores Reais']];
-
-    for (let i = 0; i < array_dos_valores_previsto_em_cada_epoca.length; i++) {
-        dados.push([
-            i,
-            parseFloat(array_dos_valores_previsto_em_cada_epoca[i][0]),
-            parseFloat(array_dos_valores_reais[i][0])
-        ]);
+    if (typeof google === 'undefined' || !google.charts) {
+        console.warn('Biblioteca de graficos do Google indisponivel (sem internet?). O treinamento continua funcionando.');
+        return;
     }
-    const data = google.visualization.arrayToDataTable(dados);
-    const options = {
-        title: 'Gráfico de Aprendizagem',
-        curveType: 'function',
-        legend: { position: 'bottom' },
-        hAxis: { title: 'Época' },
-        vAxis: { title: 'Valor' }
-    };
+    google.charts.load('current', { packages: ['corechart'] });
+    google.charts.setOnLoadCallback(function () {
+        graficoDisponivel = true;
+        redesenharGraficos(false);
+    });
+}
 
-    const chart = new google.visualization.LineChart(document.getElementById('grafico'));
-    chart.draw(data, options);
+function graficoEstaPronto() {
+    return graficoDisponivel && typeof google !== 'undefined' && google.visualization && google.visualization.LineChart;
+}
+
+/** Cria uma div de grafico por amostra, alem da que ja existe no HTML. */
+function prepararGraficosParaAsAmostras(quantidadeDeAmostras) {
+
+    var container = document.getElementById('divGraficoVariosGraficos');
+    if (!container) { return; }
+
+    // Remove os graficos extras da execucao anterior, preservando o grafico0.
+    Array.prototype.slice.call(container.children).forEach(function (filho) {
+        if (filho.id !== 'grafico0') { container.removeChild(filho); }
+    });
+
+    var modelo = document.getElementById('grafico0');
+    if (!modelo) { return; }
+
+    for (var i = 1; i < quantidadeDeAmostras; i++) {
+        var div = document.createElement('div');
+        div.id = 'grafico' + i;
+        div.className = 'divgraficos';
+        div.style.height = (modelo.offsetHeight || 220) + 'px';
+        container.appendChild(div);
+    }
+}
+
+/**
+ * Redesenha as curvas. Quando "comLimite" e verdadeiro, so redesenha se ja
+ * passou tempo suficiente desde a ultima vez -- redesenhar um grafico do Google
+ * a cada passo derrubaria a taxa de quadros da animacao.
+ */
+function redesenharGraficos(comLimite) {
+
+    if (!graficoEstaPronto()) { return; }
+
+    var agora = Date.now();
+    if (comLimite && (agora - TreinamentoRedeNeural.instanteUltimoGrafico) < 300) { return; }
+    TreinamentoRedeNeural.instanteUltimoGrafico = agora;
+
+    var estado = TreinamentoRedeNeural;
+
+    for (var amostra = 0; amostra < estado.historicoPrevistos.length; amostra++) {
+        desenharGrafico(
+            estado.historicoReais[amostra],
+            estado.historicoPrevistos[amostra],
+            'grafico' + amostra,
+            'Amostra ' + (amostra + 1) + ' - real x previsto'
+        );
+    }
+
+    desenharGraficoDeErro(estado.historicoErroGeral, 'graficoErro');
+}
+
+function desenharGrafico(valoresReais, valoresPrevistos, identificadorGrafico, titulo) {
+
+    if (!graficoEstaPronto()) { return; }
+    var alvo = document.getElementById(identificadorGrafico);
+    if (!alvo || !valoresPrevistos || valoresPrevistos.length === 0) { return; }
+
+    var dados = [['Passo', 'Valor Previsto', 'Valor Real']];
+    for (var i = 0; i < valoresPrevistos.length; i++) {
+        dados.push([i, Number(valoresPrevistos[i]) || 0, Number(valoresReais[i]) || 0]);
+    }
+
+    try {
+        var tabela = google.visualization.arrayToDataTable(dados);
+        var chart = new google.visualization.LineChart(alvo);
+        chart.draw(tabela, {
+            title: titulo || 'Grafico de Aprendizagem',
+            titleTextStyle: { color: '#d3d3d3' },
+            curveType: 'function',
+            legend: { position: 'bottom', textStyle: { color: '#d3d3d3' } },
+            backgroundColor: '#042944',
+            colors: ['#a5d817', '#00eeff'],
+            hAxis: { title: 'Passo de treinamento', textStyle: { color: '#9fb6c6' }, titleTextStyle: { color: '#9fb6c6' } },
+            vAxis: { title: 'Valor', textStyle: { color: '#9fb6c6' }, titleTextStyle: { color: '#9fb6c6' } },
+            chartArea: { width: '78%', height: '68%' }
+        });
+    } catch (erro) {
+        console.warn('Nao foi possivel desenhar o grafico ' + identificadorGrafico + ':', erro);
+    }
+}
+
+function desenharGraficoDeErro(historicoDeErro, identificadorGrafico) {
+
+    if (!graficoEstaPronto()) { return; }
+    var alvo = document.getElementById(identificadorGrafico);
+    if (!alvo || !historicoDeErro || historicoDeErro.length === 0) { return; }
+
+    var dados = [['Epoca', 'Erro Quadratico Medio']];
+    for (var i = 0; i < historicoDeErro.length; i++) {
+        dados.push([i + 1, historicoDeErro[i]]);
+    }
+
+    try {
+        var tabela = google.visualization.arrayToDataTable(dados);
+        var chart = new google.visualization.LineChart(alvo);
+        chart.draw(tabela, {
+            title: 'Curva de Erro (quanto menor, mais a rede aprendeu)',
+            titleTextStyle: { color: '#d3d3d3' },
+            curveType: 'function',
+            legend: { position: 'none' },
+            backgroundColor: '#042944',
+            colors: ['#ff9a3d'],
+            hAxis: { title: 'Epoca', textStyle: { color: '#9fb6c6' }, titleTextStyle: { color: '#9fb6c6' } },
+            vAxis: { title: 'Erro', textStyle: { color: '#9fb6c6' }, titleTextStyle: { color: '#9fb6c6' } },
+            chartArea: { width: '78%', height: '62%' }
+        });
+    } catch (erro) {
+        console.warn('Nao foi possivel desenhar a curva de erro:', erro);
+    }
 }
 
 
+/* ============================================================================
+ *  EXPORTACAO PARA OS TESTES AUTOMATIZADOS
+ * ========================================================================= */
+if (typeof module === 'object' && module.exports) {
+    module.exports = {
+        TreinamentoRedeNeural: TreinamentoRedeNeural,
+        treinarRedeNeural: treinarRedeNeural,
+        pararTreinamento: pararTreinamento,
+        pausarOuRetomarTreinamento: pausarOuRetomarTreinamento,
+        aplicarVelocidadeDoPainel: aplicarVelocidadeDoPainel,
+        montarAmostrasAPartirDoPainel: montarAmostrasAPartirDoPainel,
+        converterTextoEmValor: converterTextoEmValor,
+        lerNumeroDoCampo: lerNumeroDoCampo,
+        lerArquiteturaDasCamadasEscondidas: lerArquiteturaDasCamadasEscondidas,
+        formatarBlocoDePesos: formatarBlocoDePesos,
+        formatarLista: formatarLista
+    };
+}

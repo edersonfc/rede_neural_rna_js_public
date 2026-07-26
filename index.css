@@ -1,48 +1,471 @@
+/* ==========================================================================
+   index.css - Painel da Rede Neural Perceptron Multi-Layer
+   CSS puro, sem framework.
+   ========================================================================== */
+
+body {
+  background-color: #185380;
+  font-family: "Segoe UI", Arial, sans-serif;
+  margin: 8px;
+}
+
+/* ==========================================================================
+   LINHA PRINCIPAL: desenho da rede (esquerda) + graficos (direita)
+   ========================================================================== */
+
+#containerDrawRNAeGrafico {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  background-color: transparent;
+}
+
+#id_PrincipalContainerDrawRNA {
+  width: 620px;
+  flex: 0 0 620px;
+  background-color: #042944;
+  border-radius: 10px;
+  padding-bottom: 8px;
+}
+
+.tituloDoPainel {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 28px;
+  color: white;
+  font-size: 14px;
+}
+
+/* --------------------------------------------------------------------------
+   Faixa de botoes que monta a arquitetura
+   -------------------------------------------------------------------------- */
+
+.faixaDeArquitetura {
+  display: flex;
+  flex-direction: row;
+  height: 85px;
+  background: #031B2D;
+  justify-content: space-between;
+}
+
+.grupoDeCamada {
+  display: flex;
+  flex-direction: row;
+  gap: 2px;
+  margin: 5px;
+  background-color: #042944;
+  padding-right: 5px;
+  border-radius: 5px;
+}
+
+.rotuloDaCamada {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-left: 5px;
+  height: 60px;
+  border-radius: 10px;
+}
+
+.rotuloDaCamada label {
+  font-size: 12px;
+  color: #d3d3d3ef;
+}
+
+.contadorGrande {
+  font-size: 25px !important;
+  color: #abec43 !important;
+  font-weight: bold;
+}
+
+.contadorPequeno {
+  padding-top: 2px;
+  font-weight: bolder;
+  text-align: center;
+  width: 20px;
+  color: #abec43;
+}
+
+.contadorNeuronios {
+  font-weight: bolder;
+  text-align: center;
+  width: 22px;
+  color: white;
+}
+
+.colunaDeBotoes {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
+}
+
+.botaoAlto {
+  height: 55px;
+  border: solid 0px;
+  border-radius: 5px;
+  font-size: 15px;
+  color: white;
+  cursor: pointer;
+}
+
+#containerCamadaEscondidaGeral {
+  display: flex;
+  flex-direction: column;
+  width: 280px;
+  padding-left: 5px;
+  margin: 5px;
+  background-color: #042944;
+  border-radius: 5px;
+}
+
+#faixaBotoesQtdeCamadasEscondida {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  gap: 3px;
+  color: #d3d3d3ef;
+  font-size: 13px;
+}
+
+#faixaBotoesQtdeCamadasEscondida button {
+  border: solid 0px;
+  border-radius: 4px;
+  font-size: 14px;
+  color: white;
+  cursor: pointer;
+  width: 22px;
+}
+
+#containerCamadaEscondidaMostrador {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+}
+
+.cartaoCamadaEscondida {
+  width: 65px;
+  flex: 0 0 65px;
+  display: flex;
+  flex-direction: column;
+  background-image: linear-gradient(to right, #4623CB, #8531EC);
+  margin: 5px;
+  padding: 5px;
+  border-radius: 5px;
+}
+
+.cartaoCamadaEscondida > label {
+  text-align: center;
+  font-size: 13px;
+  color: white;
+}
+
+/* --------------------------------------------------------------------------
+   Area de desenho da rede (o canvas animado mora aqui dentro)
+   -------------------------------------------------------------------------- */
+
+#containerDrawRNA {
+  position: relative;          /* ancora o canvas absoluto: sem isso o canvas
+                                  se alinhava com a pagina inteira e as linhas
+                                  saiam do lugar ao rolar a tela */
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+  width: 100%;
+  height: 280px;
+  background-color: #031B2D;
+  overflow: hidden;
+}
+
+/* Coluna de uma camada: so serve para o flexbox posicionar os neuronios. */
+.colunaDeCamada {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+/* As bolinhas dos neuronios ficam invisiveis (o canvas as desenha), mas
+   continuam ocupando espaco para o layout funcionar. */
+.neuronioDesenhado {
+  flex: 0 0 auto;
+}
+
+.faixaDoDesenho {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: #9fb6c6;
+}
+
+.resumoArquitetura {
+  font-family: Consolas, monospace;
+  color: #abec43;
+}
+
+.grupoDeInterruptores {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+}
+
+.grupoDeInterruptores label {
+  cursor: pointer;
+  user-select: none;
+}
+
+.faixaDeBotoesDoCanvas {
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  padding-left: 8px;
+}
+
+.faixaDeBotoesDoCanvas button {
+  font-size: 12px;
+  border: solid 0px;
+  border-radius: 5px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+/* --------------------------------------------------------------------------
+   Hiper-parametros
+   -------------------------------------------------------------------------- */
+
+.blocoHiperParametros {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 6px;
+}
+
+.tituloHiperParametros {
+  text-align: center;
+  font-size: 16px;
+  color: #9fb6c6;
+}
+
+.linhaHiperParametros {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  width: 100%;
+  justify-content: space-around;
+  padding: 6px 10px;
+  gap: 8px;
+}
+
+.campoHiperParametro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: white;
+  width: 32%;
+  gap: 4px;
+}
+
+.campoHiperParametro label {
+  text-align: center;
+  font-size: 12px;
+  cursor: help;
+}
+
+.campoHiperParametro input,
+.campoHiperParametro select {
+  text-align: center;
+  width: 99%;
+  font-size: 12px;
+  font-weight: bold;
+  color: #063298;
+  border-radius: 4px;
+  border: solid 1px #185380;
+  padding: 2px;
+}
+
+.campoHiperParametro input[type="range"] {
+  padding: 0;
+  cursor: pointer;
+}
+
+.rotuloVelocidade {
+  color: #abec43;
+  font-weight: bold;
+}
+
+.linhaDeControles {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 2px 10px;
+  width: 100%;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.botaoControle {
+  background-color: #063298;
+  color: white;
+  border: solid 0px;
+  padding: 5px 12px;
+  cursor: pointer;
+  border-radius: 5px;
+}
+
+.botaoControle:hover:enabled {
+  background-color: #3a64c6;
+}
+
+.botaoControle:disabled {
+  background-color: #2b3f52;
+  color: #6f8496;
+  cursor: not-allowed;
+}
+
+.botaoParar {
+  background-color: #980606;
+}
+
+.botaoParar:hover:enabled {
+  background-color: #c12929;
+}
+
+.situacaoTreinamento {
+  font-size: 12px;
+  color: #abec43;
+  font-family: Consolas, monospace;
+  min-width: 200px;
+  text-align: center;
+}
+
+/* ==========================================================================
+   COLUNA DA DIREITA: resultados e graficos
+   ========================================================================== */
+
+.divResultadoEGraficos {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 400px;
+  min-width: 380px;
+  background-color: #042944;
+  border-radius: 10px;
+  padding: 4px;
+  gap: 4px;
+}
+
+.painelDeSaida {
+  width: 100%;
+  background: #031B2D;
+  color: #d3d3d3ef;
+  border-radius: 8px;
+}
+
+.painelDeSaida h2 {
+  width: 100%;
+  text-align: center;
+  font-size: 17px;
+  margin: 6px 0;
+}
+
+.caixaDeResultado {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  background: #0c2b43;
+  padding: 4px 0;
+  gap: 3px;
+}
+
+.caixaDeResultado label:first-child {
+  font-size: 12px;
+  color: #9fb6c6;
+}
+
+.caixaDeResultado label:last-child {
+  font-family: Consolas, monospace;
+  font-weight: bold;
+  color: #abec43;
+  text-align: center;
+}
+
+#divGraficoVariosGraficos {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.divgraficos {
+  width: 100%;
+  min-height: 220px;
+  background-color: #042944;
+  margin: 4px 0;
+}
+
+.graficoDeErro {
+  flex: 0 0 200px;
+  min-height: 200px;
+  border-bottom: solid 1px #185380;
+}
+
+/* ==========================================================================
+   SEGUNDA E TERCEIRA LINHAS: pesos, campos de dados e saidas por epoca
+   ========================================================================== */
+
 .div_componente {
   display: flex;
   flex-direction: row;
-  align-content: center;
+  align-items: stretch;
   justify-content: space-evenly;
   width: 100%;
   background-color: #042944;
   margin-top: 5px;
   border-radius: 5px;
-  padding-top: 5px;
-  padding-bottom: 5px;
-
+  padding: 5px 0;
+  gap: 5px;
 }
 
 .div_text_area {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
   width: 21%;
-  gap: 10px;
-  color: white;
-  color: #d3d3d3ef
+  gap: 8px;
+  color: #d3d3d3ef;
 }
 
 .textarea-componente {
   display: block;
   border: 1px solid #ccc;
   width: 100%;
-  height: 100%;
+  height: 190px;
   resize: vertical;
   border-radius: 5px;
+  font-family: Consolas, monospace;
+  font-size: 11px;
+  background: #f4f8fb;
 }
-
 
 .div_componente2 {
   display: flex;
   flex-direction: column;
-  align-content: center;
-  justify-content: space-evenly;
   width: 100%;
   background-color: #042944;
   margin-top: 5px;
   border-radius: 5px;
-
+  color: #d3d3d3ef;
+  padding-top: 8px;
 }
 
 .textarea-componente2 {
@@ -53,30 +476,10 @@
   resize: vertical;
   margin: 10px;
   border-radius: 5px;
+  font-family: Consolas, monospace;
+  font-size: 11px;
+  background: #f4f8fb;
 }
-
-
-/* */
-.divResultadoEGraficos {
-
-  display: flex;
-  flex-direction: column;
-  align-content: center;
-  justify-content: left;
-  width: 100%;
-  height: 100%;
-  background-color: #042944;
-  border-radius: 10px;
-
-}
-
-.divgraficos {
-  width: 90%px;
-  height: 95%;
-  background-color: #042944;
-  margin: 10px;
-}
-
 
 .div_dados_de_entrada {
   display: flex;
@@ -85,11 +488,11 @@
   width: 20%;
   border-radius: 8px;
   background: #042944;
-  padding-bottom: 15px;
-  padding-top: 15px;
+  padding: 12px 0;
   border: solid 1px #185380;
   color: #d3d3d3ef;
-
+  max-height: 260px;
+  overflow-y: auto;
 }
 
 .div_dados_de_entrada_input {
@@ -100,11 +503,39 @@
   margin-top: 5px;
 }
 
+.blocoCampoDeDado {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: white;
+  width: 90%;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.blocoCampoDeDado label {
+  text-align: center;
+  font-size: 12px;
+}
+
+.campoDeDado {
+  text-align: center;
+  width: 100%;
+  font-weight: bold;
+  color: #063298;
+  border-radius: 4px;
+  border: solid 1px #185380;
+}
+
+/* ==========================================================================
+   BOTOES GERAIS
+   ========================================================================== */
+
 .botaoInidiarCss {
   background-color: green;
   color: white;
   border: solid 0px;
-  padding: 5px;
+  padding: 5px 14px;
   cursor: pointer;
   border-radius: 5px;
 }
@@ -112,7 +543,6 @@
 .botaoInidiarCss:hover {
   background-color: rgb(0, 128, 96);
 }
-
 
 .botaoSubtrair {
   background: #980606;
@@ -122,53 +552,44 @@
   background: #c12929;
 }
 
-
 .botaoSomar {
   background: #063298;
 }
-
 
 .botaoSomar:hover {
   background: #3a64c6;
 }
 
-
-.botaoSubtrair2:hover {
-  background: #980606;
+.botaoSubtrair2,
+.botaoSomar2 {
   border: solid 0px;
   border-radius: 5px;
   color: white;
-  margin-right: 2px;
+  background: rgba(0, 0, 0, 0.25);
   font-weight: bold;
-}
-
-
-.botaoSubtrair2:hover {
-  background: #980606;
-  border: solid 0px;
-  border-radius: 5px;
-  color: white;
   margin-right: 2px;
-  font-weight: bold;
   cursor: pointer;
+  width: 20px;
 }
 
+.botaoSubtrair2:hover {
+  background: #980606;
+}
 
 .botaoSomar2:hover {
   background: #063298;
-  border: solid 0px;
-  border-radius: 5px;
-  color: white;
-  font-weight: bold;
+}
+
+.botaoCarregarJson {
+  text-align: center;
+  font-size: 11px;
+  height: 20px;
   cursor: pointer;
 }
 
-
-.faixaResultadp {
-  background-color: #0c2b43;
-}
-
-
+/* ==========================================================================
+   CAIXAS DE CONFIGURACAO (modais)
+   ========================================================================== */
 
 .configEntradaDeDados1 {
   display: flex;
@@ -177,23 +598,21 @@
   gap: 3px;
   width: 98%;
   font-size: 12px;
-
 }
 
 .configEntradaDeDados2 {
   display: flex;
   flex-direction: column;
-  justify-content: start;
+  justify-content: flex-start;
   align-items: center;
-  height: 45px;
+  height: 48px;
   width: 97%;
   padding-top: 5px;
   background-color: #042944;
   border: solid 1px #185380;
   border-radius: 8px;
-  margin: 0px;
+  gap: 4px;
 }
-
 
 .aplicarConfigEntrada {
   width: 97%;
@@ -203,106 +622,81 @@
   padding: 5px;
   cursor: pointer;
   border-radius: 5px;
-  cursor: pointer;
 }
 
 .aplicarConfigEntrada:hover {
   background-color: rgb(0, 128, 96);
 }
 
-
-.iconCogsConfigEntradasDeDados {
-  padding-left: 10px;
-  padding-top: 5px;
-  color: white;
-  font-size: 20px;
-  cursor: pointer;
-}
-
-.iconCogsConfigEntradasDeDados:hover {
-  color: #00eeff;
-  cursor: pointer;
-}
-
+.iconCogsConfigEntradasDeDados,
 .iconCogsConfigEntradasDeDadosNormalizado {
-  padding-left: 5px;
-
+  padding-left: 8px;
+  padding-top: 4px;
   color: white;
   font-size: 20px;
   cursor: pointer;
 }
 
+.iconCogsConfigEntradasDeDados:hover,
 .iconCogsConfigEntradasDeDadosNormalizado:hover {
   color: #00eeff;
-  cursor: pointer;
 }
 
-
-
+.fundaCaixaDeDialogPlaceholder {
+  display: none;
+}
 
 .fundoCaixaDeDialogBlackTranslucido_css {
   display: none;
-  flex-direction: row;
   width: 100%;
   min-height: 100%;
   position: absolute;
-  top: 0px;
-  left: 0px;
+  top: 0;
+  left: 0;
   z-index: 9;
   background-color: rgba(0, 0, 0, 0.7);
 }
 
-
 .div_componente3 {
   display: none;
   flex-direction: column;
-  align-content: center;
-  justify-content: center;
-  width: 450px;
-  margin-top: 15px;
+  width: 470px;
   background-color: #031B2D;
   border: solid 1px #185380;
   border-radius: 5px;
   color: white;
-  
-
   position: absolute;
-  top: 60%;
-  left: 55%;
+  top: 55%;
+  left: 50%;
   transform: translate(-50%, -50%);
   z-index: 10;
-
+  padding-bottom: 10px;
 }
 
 .textarea-componente3 {
   border: 1px solid #ccc;
-  height: 340px;
+  height: 300px;
   width: 95%;
   background: #DBF2DC;
   resize: vertical;
   margin: 10px;
   border-radius: 5px;
+  font-family: Consolas, monospace;
+  font-size: 12px;
 }
-
 
 .div_componente4 {
   display: none;
   flex-direction: column;
-  align-content: center;
-  justify-content: center;
   width: 390px;
   height: 450px;
-  margin-top: 15px;
   background: #031B2D;
   border: solid 1px #185380;
   border-radius: 5px;
   color: white;
   position: absolute;
   z-index: 11;
-
-
 }
-
 
 .textarea-componente4 {
   display: flex;
@@ -313,23 +707,23 @@
   resize: vertical;
   margin: 10px;
   border-radius: 5px;
+  font-family: Consolas, monospace;
+  font-size: 11px;
 }
 
-
+/* Barra de rolagem fina para a faixa de camadas escondidas */
 .scroll-fino {
   overflow-y: hidden;
   overflow-x: auto;
   border: none;
-
-  ::-webkit-scrollbar {
-    width: 1px;
-    height: 1px;
-    background-color: #042944;
-
-    ::-webkit-scrollbar-thumb {
-      background-color: #031B2D;
-    }
-  }
 }
 
+.scroll-fino::-webkit-scrollbar {
+  height: 5px;
+  background-color: #042944;
+}
 
+.scroll-fino::-webkit-scrollbar-thumb {
+  background-color: #185380;
+  border-radius: 3px;
+}

@@ -1,0 +1,24 @@
+{
+  "name": "rede-neural-rna-js-public",
+  "version": "2.0.0",
+  "description": "Rede neural Perceptron Multi-Layer didatica em JavaScript puro, com painel HTML e animacao das conexoes no canvas.",
+  "private": true,
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cobertura": "jest --coverage"
+  },
+  "keywords": [
+    "rede-neural",
+    "perceptron",
+    "javascript-puro",
+    "didatico"
+  ],
+  "author": "Ederson Feliciano Corsatto",
+  "license": "MIT",
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "jest-canvas-mock": "^2.5.2"
+  }
+}
