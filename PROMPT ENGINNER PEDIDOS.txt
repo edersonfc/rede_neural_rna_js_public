@@ -1,0 +1,15 @@
+A MINHA IDÉA AQUI É ENSINAR PARA AS PESSOAS COMO FUNCIONA UMA REDE NEURAL SIMPLES QUE NO CASO AQUI É SOMENTE UM
+  PERCEPTRON MULTLAYER, ONDE EU TENHO UM PAINEL HTML ONDE EU CONSIGO AJUSTAR TODA A EXTRUTURA DA RN PERCEPTRON CRIANDO
+  QUANTOS NEURÔNIOS EU QUEIRA EM QUAL QUER CAMADA SEJA ENTRADA ESCONDIDA OU SAIDA E TAMBEM AJUSTANDO ESSES PARAMETROS COMO
+  Taxa Aprendizagem, Regulação Lambda:,Épocas Treinamento etc; esse painel html é todo ajustável e ele mostra
+  gráficamente cada neuronio graficamente e suas conexões, e é claro que como é somente para mostrar didaticamente é
+  inviável na pratica colocar gráficamente grande quantidade de neuronio que não cabe na tela; e também tem um do lado
+  direito um gráfico que vai mostrando em tempo real as tentativas de erros e acertos do treinamento e se autoajustando
+  conforme o treinamento vai sendo executado; aqui está o painel
+  "file:///D:/0000000-JAVASCRIPT_e_PYTHON-e-NEXTJS-so-compactados-29-06-2026/JAVASCRIPT_CODIGOS_ESTUDOS-29-06-2026-14hrs_1
+  6m/REDE_NEURAIS_JAVASCRIPT_PURO_VARIOS_TIPOS/PERCEPTRONS/rede_neural_rna_js_public/painel_rede_neural_pml.html"; unica
+  coisa que eu quero melorar é que durante o processo de funcionamento da rede neural enquanto ela está funcionando eu
+  queria os neuronios que são renderizados no canvas (id="meuCanvas") fossem exibindo animações das conexões e iterações
+  entre os seus neurônios e fios; pode implementar isso pra mim, e se tiver algo para melhorar ou algum erro e falha
+  conserte, e se puder criar cobertura de testes automatizados pra ele também; lembrando que ele foi feito em javascript
+  puro e html simples; e tem que continuar assim em html e javascript puro !
