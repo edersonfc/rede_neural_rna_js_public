@@ -123,7 +123,13 @@
         this.duracaoCiclo = 1100;      // milissegundos de um ciclo frente+tras
         this.passoAtual = null;        // dados do ultimo passo de treinamento
         this.filaDePassos = [];        // passos aguardando para serem animados
+
+        // As ondas SO aparecem quando ha algo realmente acontecendo: ou a rede
+        // esta treinando, ou o usuario pediu uma demonstracao pelo botao
+        // "Testar Conexoes". Fora isso o canvas mostra a rede parada.
         this.emTreinamento = false;
+        this.emDemonstracao = false;
+        this.ciclosRestantesDaDemonstracao = 0;
 
         // Opcoes visuais (ligadas/desligadas pelo painel)
         this.mostrarValores = true;
@@ -196,11 +202,55 @@
      *  CICLO DE VIDA DA ANIMACAO
      * ===================================================================== */
 
+    /**
+     * Diz se as ondas devem ser desenhadas neste quadro.
+     *
+     * Animar sem nada acontecendo confunde quem esta aprendendo: da a impressao
+     * de que a rede esta trabalhando quando ela esta parada. Por isso os pulsos
+     * so aparecem durante o treinamento ou durante a demonstracao.
+     */
+    AnimadorRedeNeural.prototype.deveAnimarOndas = function () {
+        return this.ligado && (this.emTreinamento || this.emDemonstracao);
+    };
+
     AnimadorRedeNeural.prototype.iniciar = function () {
         if (this.rodando || !this.contexto) { return; }
         this.rodando = true;
         this.instanteAnterior = 0;
         this.agendarProximoQuadro();
+    };
+
+    /**
+     * Desenha UM unico quadro da rede em repouso: os fios e os neuronios, sem
+     * pulso nenhum. E o que aparece ao abrir a pagina e ao terminar o treino.
+     */
+    AnimadorRedeNeural.prototype.desenharQuadroEstatico = function () {
+        this.parar();
+        this.fase = 0;
+        this.brilhoPorNeuronio = {};
+        this.ondas = [];
+        this.desenhar();
+    };
+
+    /**
+     * Roda a animacao por alguns ciclos e para sozinha. Usada pelo botao
+     * "Testar Conexoes", que mostra o caminho do sinal sem treinar nada.
+     */
+    AnimadorRedeNeural.prototype.iniciarDemonstracao = function (quantidadeDeCiclos) {
+        if (!this.contexto) { return; }
+        this.emTreinamento = false;
+        this.emDemonstracao = true;
+        this.ciclosRestantesDaDemonstracao = Math.max(1, quantidadeDeCiclos || 2);
+        this.fase = 0;
+        this.brilhoPorNeuronio = {};
+        this.ondas = [];
+        this.iniciar();
+    };
+
+    AnimadorRedeNeural.prototype.encerrarDemonstracao = function () {
+        this.emDemonstracao = false;
+        this.ciclosRestantesDaDemonstracao = 0;
+        this.desenharQuadroEstatico();
     };
 
     AnimadorRedeNeural.prototype.parar = function () {
@@ -251,6 +301,20 @@
         while (this.fase >= 1) {
             this.fase -= 1;
             this.consumirProximoPasso();
+
+            // A demonstracao tem hora para acabar: passados os ciclos pedidos,
+            // a animacao para sozinha e a rede volta a ficar em repouso.
+            if (this.emDemonstracao) {
+                this.ciclosRestantesDaDemonstracao--;
+                if (this.ciclosRestantesDaDemonstracao <= 0) {
+                    this.emDemonstracao = false;
+                    this.fase = 0;
+                    this.brilhoPorNeuronio = {};
+                    this.ondas = [];
+                    this.parar();
+                    return;
+                }
+            }
         }
 
         // O brilho de cada neuronio decai suavemente ate apagar.
@@ -303,8 +367,15 @@
         if (!this.passoAtual) { this.consumirProximoPasso(); }
     };
 
+    /**
+     * O treinamento acabou (ou foi parado): a animacao para e o canvas fica
+     * mostrando a rede em repouso, com os pesos que ela aprendeu.
+     */
     AnimadorRedeNeural.prototype.encerrarTreinamento = function () {
+        var estavaAtivo = this.emTreinamento;
         this.emTreinamento = false;
+        this.filaDePassos = [];
+        if (estavaAtivo) { this.desenharQuadroEstatico(); }
     };
 
     AnimadorRedeNeural.prototype.limpar = function () {
@@ -313,6 +384,9 @@
         this.brilhoPorNeuronio = {};
         this.ondas = [];
         this.emTreinamento = false;
+        this.emDemonstracao = false;
+        this.ciclosRestantesDaDemonstracao = 0;
+        this.fase = 0;
         this.informacao = { epoca: 0, totalEpocas: 0, amostra: 0, totalAmostras: 0, erro: null };
         if (this.contexto && this.canvas) {
             this.contexto.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -398,10 +472,16 @@
         // Segmentos = entrada de dados + (camadas - 1) ligacoes + saida final.
         var quantidadeSegmentos = quantidadeCamadas + 1;
 
-        var ondaFrente = this.ligado
+        // Sem treinamento e sem demonstracao, os dois arrays ficam vazios: o
+        // canvas desenha a rede parada, sem pulso algum viajando pelos fios.
+        var animarOndas = this.deveAnimarOndas();
+
+        var ondaFrente = animarOndas
             ? this.calcularProgressoDosSegmentos(quantidadeSegmentos, JANELA_FRENTE_INICIO, JANELA_FRENTE_FIM, false)
             : [];
-        var ondaTras = (this.ligado && this.emTreinamento)
+        // O erro so volta quando ha treinamento; na demonstracao o sinal apenas
+        // percorre a rede para frente.
+        var ondaTras = (animarOndas && this.emTreinamento)
             ? this.calcularProgressoDosSegmentos(quantidadeSegmentos, JANELA_TRAS_INICIO, JANELA_TRAS_FIM, true)
             : [];
 
@@ -837,7 +917,8 @@
     };
 
     AnimadorRedeNeural.prototype.faseAtualEmTexto = function () {
-        if (!this.ligado) { return null; }
+        // Com a rede parada nao ha fase nenhuma para anunciar.
+        if (!this.deveAnimarOndas()) { return null; }
         if (this.fase >= JANELA_FRENTE_INICIO && this.fase <= JANELA_FRENTE_FIM) {
             return { texto: 'PROPAGACAO ->', cor: rgba(CORES.pulsoFrente, 0.9) };
         }

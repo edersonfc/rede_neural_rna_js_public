@@ -220,10 +220,22 @@ function prepararAnimador(canvas) {
     neuroniosDesenhadosNoCanvas = true;
 
     // O layout so tem medidas confiaveis depois que o navegador desenha.
+    //
+    // Aqui a rede e desenhada UMA vez, parada. O laco de animacao NAO comeca:
+    // ele so roda enquanto a rede esta treinando ou durante a demonstracao do
+    // botao "Testar Conexoes". Animar com a pagina recem-aberta daria a
+    // impressao de que a rede esta processando algo quando ela esta parada.
     requestAnimationFrame(function () {
         animadorDaRede.atualizarGeometria();
-        animadorDaRede.iniciar();
+        animadorDaRede.desenharQuadroEstatico();
     });
+}
+
+/** Redesenha a rede parada, mas so quando a animacao nao esta rodando. */
+function redesenharSeEstiverParado() {
+    if (animadorDaRede && !animadorDaRede.rodando) {
+        animadorDaRede.desenharQuadroEstatico();
+    }
 }
 
 function esconderDivsDeNeuronios() {
@@ -581,17 +593,15 @@ function iniciarTreinamentoPeloPainel() {
 }
 
 /**
- * "Teste Conexoes": roda a animacao sem treinar, so para o aluno ver o caminho
- * que o sinal percorre. Como nao ha passo de treinamento, o animador desenha
- * apenas a onda de ida.
+ * "Testar Conexoes": roda a animacao por alguns ciclos, sem treinar, so para o
+ * aluno ver o caminho que o sinal percorre. Como nao ha passo de treinamento, o
+ * animador desenha apenas a onda de ida -- e para sozinho no fim.
  */
 function testarAnimacaoDasConexoes() {
     if (!animadorDaRede) { return; }
     animadorDaRede.limpar();
     animadorDaRede.atualizarGeometria();
-    animadorDaRede.emTreinamento = false;
-    animadorDaRede.fase = 0;
-    animadorDaRede.iniciar();
+    animadorDaRede.iniciarDemonstracao(3);
 }
 
 function ligarBotoesDoPainel() {
@@ -621,6 +631,10 @@ function ligarBotoesDoPainel() {
             if (animadorDaRede) {
                 animadorDaRede.parar();
                 animadorDaRede.limpar();
+                // Apaga o que o treinamento deixou (brilhos, valores, erro) e
+                // redesenha a rede em repouso. Sem isso o painel ficaria preto,
+                // sem nenhuma forma de trazer o desenho de volta.
+                animadorDaRede.desenharQuadroEstatico();
             }
         });
     }
@@ -633,13 +647,26 @@ function ligarBotoesDoPainel() {
     ligarInterruptor('id_animacaoLigada', function (ligado) {
         if (!animadorDaRede) { return; }
         animadorDaRede.ligado = ligado;
-        if (ligado) { animadorDaRede.iniciar(); } else { animadorDaRede.parar(); animadorDaRede.limpar(); }
+        if (ligado) {
+            // Religar so volta a animar se houver algo acontecendo de fato.
+            if (animadorDaRede.emTreinamento || animadorDaRede.emDemonstracao) {
+                animadorDaRede.iniciar();
+            } else {
+                animadorDaRede.desenharQuadroEstatico();
+            }
+        } else {
+            animadorDaRede.desenharQuadroEstatico();
+        }
     });
     ligarInterruptor('id_mostrarValores', function (ligado) {
-        if (animadorDaRede) { animadorDaRede.mostrarValores = ligado; }
+        if (!animadorDaRede) { return; }
+        animadorDaRede.mostrarValores = ligado;
+        redesenharSeEstiverParado();
     });
     ligarInterruptor('id_mostrarPesos', function (ligado) {
-        if (animadorDaRede) { animadorDaRede.mostrarPesos = ligado; }
+        if (!animadorDaRede) { return; }
+        animadorDaRede.mostrarPesos = ligado;
+        redesenharSeEstiverParado();
     });
 
     var carregarJson = document.getElementById('idCarregarJson');
@@ -664,7 +691,11 @@ function ligarBotoesDoPainel() {
     // Redesenhar a geometria quando a janela muda de tamanho: as posicoes dos
     // neuronios sao lidas do layout, entao elas mudam junto.
     window.addEventListener('resize', function () {
-        if (animadorDaRede) { animadorDaRede.atualizarGeometria(); }
+        if (!animadorDaRede) { return; }
+        animadorDaRede.atualizarGeometria();
+        // Com a animacao parada nao ha proximo quadro para corrigir o desenho,
+        // entao e preciso redesenhar a rede na posicao nova.
+        redesenharSeEstiverParado();
     });
 }
 

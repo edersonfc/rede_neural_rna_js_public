@@ -30,6 +30,11 @@ tanto na camada de entrada quanto na de saída.
 Enquanto a rede treina, o `<canvas>` mostra o que está realmente acontecendo — e os números
 **não são inventados**: cada quadro é desenhado com os valores que o motor acabou de calcular.
 
+> **A animação só roda quando há algo acontecendo.** Com a página recém-aberta, ou com o
+> treinamento parado ou pausado, o canvas mostra a rede **em repouso**: os fios e os neurônios
+> aparecem, mas nenhum pulso circula. Animar com a rede parada daria a impressão de que ela
+> está processando algo quando não está.
+
 | O que você vê | O que significa |
 |---|---|
 | 🟢 **Pulsos verdes** indo da esquerda para a direita | A **propagação para frente**: o sinal saindo dos dados, atravessando cada camada até virar a previsão |
@@ -45,8 +50,10 @@ Controles logo abaixo do desenho:
 - **Velocidade** — no mínimo, dá para acompanhar cada onda percorrendo a rede fio a fio; no máximo,
   o treino corre solto e a animação mostra sempre o passo mais recente.
 - **Animar / Valores / Pesos** — liga e desliga a animação, os valores dentro dos neurônios e os pesos escritos sobre os fios.
-- **Pausar / Continuar / Parar** — o treinamento roda passo a passo e pode ser congelado a qualquer momento.
-- **Testar Conexões** — roda a animação sem treinar, só para ver o caminho do sinal.
+- **Pausar / Continuar / Parar** — o treinamento roda passo a passo e pode ser congelado a qualquer
+  momento; a animação congela junto e volta a rodar ao continuar.
+- **Testar Conexões** — mostra o caminho do sinal sem treinar nada: roda alguns ciclos e para sozinho.
+- **Limpar Canvas** — para tudo e devolve a rede ao estado de repouso.
 
 ---
 

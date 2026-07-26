@@ -93,6 +93,136 @@ describe('Utilitarios da animacao', () => {
 
 
 /* ==========================================================================
+ *  QUANDO A ANIMACAO PODE ACONTECER
+ * ------------------------------------------------------------------------
+ *  Animar sem nada acontecendo confunde quem esta aprendendo: parece que a
+ *  rede esta processando algo quando ela esta parada. Os pulsos so existem
+ *  durante o treinamento ou durante a demonstracao do "Testar Conexoes".
+ * ======================================================================= */
+describe('Quando a animacao pode acontecer', () => {
+
+    test('animador recem-criado esta em repouso e nao anima nada', () => {
+        const animador = criarAnimador();
+
+        expect(animador.rodando).toBe(false);
+        expect(animador.emTreinamento).toBe(false);
+        expect(animador.emDemonstracao).toBe(false);
+        expect(animador.deveAnimarOndas()).toBe(false);
+    });
+
+    test('so anima com treinamento OU com demonstracao em curso', () => {
+        const animador = criarAnimador();
+
+        animador.ligado = true;
+        expect(animador.deveAnimarOndas()).toBe(false);
+
+        animador.emTreinamento = true;
+        expect(animador.deveAnimarOndas()).toBe(true);
+
+        animador.emTreinamento = false;
+        animador.emDemonstracao = true;
+        expect(animador.deveAnimarOndas()).toBe(true);
+
+        // O interruptor "Animar" desliga tudo, mesmo treinando.
+        animador.ligado = false;
+        animador.emTreinamento = true;
+        expect(animador.deveAnimarOndas()).toBe(false);
+    });
+
+    test('em repouso NENHUM pulso e desenhado, em fase nenhuma do ciclo', () => {
+        const animador = criarAnimador();
+        const escrever = jest.spyOn(animador.contexto, 'fillText');
+
+        for (let fase = 0; fase < 1; fase += 0.05) {
+            animador.fase = fase;
+            animador.desenhar();
+        }
+
+        const textos = escrever.mock.calls.map((chamada) => String(chamada[0]));
+        expect(textos.some((texto) => texto.includes('PROPAGACAO'))).toBe(false);
+        expect(textos.some((texto) => texto.includes('RETROPROPAGACAO'))).toBe(false);
+    });
+
+    test('em repouso desenha MENOS circulos do que treinando (sem os pulsos)', () => {
+        const animador = criarAnimador();
+        animador.fase = 0.25;
+
+        const emRepouso = jest.spyOn(animador.contexto, 'arc');
+        animador.desenhar();
+        const circulosEmRepouso = emRepouso.mock.calls.length;
+        emRepouso.mockRestore();
+
+        animador.registrarPasso({
+            ativacoes: [[1, 1], [0.8, 0.9], [0.5, 0.6, 0.7], [0.4]],
+            deltas: [[0, 0], [0.1, 0.2], [0.1, 0.2, 0.3], [0.4]],
+            erro: 0.5, epoca: 1, totalEpocas: 10, amostra: 1, totalAmostras: 1
+        });
+        animador.fase = 0.25;
+
+        const treinando = jest.spyOn(animador.contexto, 'arc');
+        animador.desenhar();
+        expect(treinando.mock.calls.length).toBeGreaterThan(circulosEmRepouso);
+    });
+
+    test('desenharQuadroEstatico para o laco e zera o brilho', () => {
+        const animador = criarAnimador();
+        animador.rodando = true;
+        animador.fase = 0.4;
+        animador.brilhoPorNeuronio = { '0:0': 1 };
+        animador.ondas = [{ x: 0, y: 0, raioInicial: 5, idade: 0, duracao: 100, cor: [0, 0, 0] }];
+
+        animador.desenharQuadroEstatico();
+
+        expect(animador.rodando).toBe(false);
+        expect(animador.fase).toBe(0);
+        expect(animador.brilhoPorNeuronio).toEqual({});
+        expect(animador.ondas).toEqual([]);
+    });
+
+    test('iniciarDemonstracao anima e se encerra apos os ciclos pedidos', () => {
+        const animador = criarAnimador();
+        animador.parar = jest.fn(() => { animador.rodando = false; });
+
+        animador.iniciarDemonstracao(2);
+        expect(animador.emDemonstracao).toBe(true);
+        expect(animador.deveAnimarOndas()).toBe(true);
+
+        animador.avancar(animador.duracaoCiclo);           // fim do 1o ciclo
+        expect(animador.emDemonstracao).toBe(true);
+
+        animador.avancar(animador.duracaoCiclo);           // fim do 2o ciclo
+        expect(animador.emDemonstracao).toBe(false);
+        expect(animador.deveAnimarOndas()).toBe(false);
+        expect(animador.parar).toHaveBeenCalled();
+    });
+
+    test('na demonstracao o erro NAO volta: so existe a onda de ida', () => {
+        const animador = criarAnimador();
+        animador.iniciarDemonstracao(3);
+        animador.fase = 0.8;   // instante em que a retropropagacao aconteceria
+
+        const escrever = jest.spyOn(animador.contexto, 'fillText');
+        animador.desenhar();
+
+        const textos = escrever.mock.calls.map((chamada) => String(chamada[0]));
+        expect(textos.some((texto) => texto.includes('RETROPROPAGACAO'))).toBe(false);
+    });
+
+    test('encerrarTreinamento devolve a rede ao repouso', () => {
+        const animador = criarAnimador();
+        animador.registrarPasso({ ativacoes: [[1]], deltas: [[0]], erro: 0.1, epoca: 1 });
+        animador.rodando = true;
+
+        animador.encerrarTreinamento();
+
+        expect(animador.emTreinamento).toBe(false);
+        expect(animador.rodando).toBe(false);
+        expect(animador.deveAnimarOndas()).toBe(false);
+    });
+});
+
+
+/* ==========================================================================
  *  ONDAS: quem esta aceso e quando
  * ======================================================================= */
 describe('Progresso das ondas', () => {

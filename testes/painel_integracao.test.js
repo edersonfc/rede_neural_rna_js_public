@@ -33,10 +33,6 @@ beforeEach(() => {
     jest.useFakeTimers({ doNotFake: ['requestAnimationFrame', 'cancelAnimationFrame'] });
 
     contexto = montarPainelCompleto();
-
-    // O animador e criado ligado (comportamento correto no navegador); nos
-    // testes o laco fica parado e cada teste chama desenhar() quando precisa.
-    if (TreinamentoRedeNeural.animador) { TreinamentoRedeNeural.animador.parar(); }
 });
 
 afterEach(() => {
@@ -543,6 +539,97 @@ describe('Animacao ligada ao treinamento de verdade', () => {
         expect(TreinamentoRedeNeural.animador.canvas.id).toBe('meuCanvas');
     });
 
+    test('ao ABRIR a pagina a rede fica parada: nada de animacao sozinha', () => {
+        const animador = TreinamentoRedeNeural.animador;
+
+        expect(animador.rodando).toBe(false);
+        expect(animador.emTreinamento).toBe(false);
+        expect(animador.emDemonstracao).toBe(false);
+        expect(animador.deveAnimarOndas()).toBe(false);
+        expect(TreinamentoRedeNeural.situacao).toBe('parado');
+    });
+
+    test('com a rede parada o canvas desenha os fios, mas NENHUM pulso', () => {
+        simularLayoutDosNeuronios();
+        const animador = TreinamentoRedeNeural.animador;
+        animador.atualizarGeometria();
+
+        const linha = jest.spyOn(animador.contexto, 'lineTo');
+        const escrever = jest.spyOn(animador.contexto, 'fillText');
+
+        // Varre o ciclo inteiro: em nenhum instante pode surgir onda.
+        for (let fase = 0; fase < 1; fase += 0.05) {
+            animador.fase = fase;
+            animador.desenhar();
+            expect(animador.deveAnimarOndas()).toBe(false);
+        }
+
+        // Os fios continuam desenhados (a arquitetura fica visivel)...
+        expect(linha.mock.calls.length).toBeGreaterThan(0);
+
+        // ...mas o rotulo de fase, que so existe durante o movimento, nao.
+        const textos = escrever.mock.calls.map((chamada) => String(chamada[0]));
+        expect(textos.some((texto) => texto.includes('PROPAGACAO'))).toBe(false);
+        expect(textos.some((texto) => texto.includes('RETROPROPAGACAO'))).toBe(false);
+        // A arquitetura, essa sim, aparece.
+        expect(textos).toContain('Entrada (3)');
+    });
+
+    test('mexer na arquitetura nao dispara animacao nenhuma', () => {
+        const animador = TreinamentoRedeNeural.animador;
+
+        adicionarOuRemoverNeuroniosCamadaDeEntrada('+');
+        criarComponentesDaCamadaEscondida('+');
+
+        expect(TreinamentoRedeNeural.animador.rodando).toBe(false);
+        expect(TreinamentoRedeNeural.animador.deveAnimarOndas()).toBe(false);
+    });
+
+    test('a animacao comeca ao Iniciar e termina junto com o treinamento', () => {
+        const animador = TreinamentoRedeNeural.animador;
+        document.getElementById('id_epocasDeTreinamento').value = '3';
+        document.getElementById('id_velocidadeTreinamento').value = '100';
+        aplicarVelocidadeDoPainel();
+
+        expect(animador.rodando).toBe(false);
+
+        document.getElementById('botaoIniciar').click();
+        expect(animador.rodando).toBe(true);
+        expect(animador.deveAnimarOndas()).toBe(true);
+
+        jest.advanceTimersByTime(20000);
+
+        expect(TreinamentoRedeNeural.situacao).toBe('parado');
+        expect(animador.rodando).toBe(false);
+        expect(animador.emTreinamento).toBe(false);
+        expect(animador.deveAnimarOndas()).toBe(false);
+    });
+
+    test('pausar congela a animacao; continuar volta a animar', () => {
+        document.getElementById('id_epocasDeTreinamento').value = '2000';
+        document.getElementById('botaoIniciar').click();
+
+        const animador = TreinamentoRedeNeural.animador;
+        expect(animador.rodando).toBe(true);
+
+        document.getElementById('id_botaoPausar').click();
+        expect(animador.rodando).toBe(false);
+
+        document.getElementById('id_botaoPausar').click();
+        expect(animador.rodando).toBe(true);
+    });
+
+    test('parar o treinamento tambem para a animacao', () => {
+        document.getElementById('id_epocasDeTreinamento').value = '2000';
+        document.getElementById('botaoIniciar').click();
+        expect(TreinamentoRedeNeural.animador.rodando).toBe(true);
+
+        document.getElementById('id_botaoParar').click();
+
+        expect(TreinamentoRedeNeural.animador.rodando).toBe(false);
+        expect(TreinamentoRedeNeural.animador.emTreinamento).toBe(false);
+    });
+
     test('as bolinhas do DOM viram ancoras invisiveis (o canvas as desenha)', () => {
         const neuronios = document.querySelectorAll('.neuronioDesenhado');
         expect(neuronios.length).toBeGreaterThan(0);
@@ -602,18 +689,37 @@ describe('Animacao ligada ao treinamento de verdade', () => {
         expect(textos).toContain(primeiraAtivacao.toFixed(2));
     });
 
-    test('desligar a animacao para o desenho, ligar volta a desenhar', () => {
+    test('desligar a animacao interrompe o laco mesmo durante o treinamento', () => {
         const animador = TreinamentoRedeNeural.animador;
         const interruptor = document.getElementById('id_animacaoLigada');
+
+        document.getElementById('id_epocasDeTreinamento').value = '2000';
+        document.getElementById('botaoIniciar').click();
+        expect(animador.rodando).toBe(true);
 
         interruptor.checked = false;
         interruptor.dispatchEvent(new Event('change'));
         expect(animador.ligado).toBe(false);
         expect(animador.rodando).toBe(false);
 
+        // Religar durante o treinamento volta a animar.
         interruptor.checked = true;
         interruptor.dispatchEvent(new Event('change'));
         expect(animador.ligado).toBe(true);
+        expect(animador.rodando).toBe(true);
+    });
+
+    test('religar a animacao com a rede parada NAO comeca a animar', () => {
+        const animador = TreinamentoRedeNeural.animador;
+        const interruptor = document.getElementById('id_animacaoLigada');
+
+        interruptor.checked = false;
+        interruptor.dispatchEvent(new Event('change'));
+        interruptor.checked = true;
+        interruptor.dispatchEvent(new Event('change'));
+
+        expect(animador.ligado).toBe(true);
+        expect(animador.rodando).toBe(false);
     });
 
     test('os interruptores de valores e pesos chegam no animador', () => {
@@ -630,25 +736,44 @@ describe('Animacao ligada ao treinamento de verdade', () => {
         expect(animador.mostrarPesos).toBe(true);
     });
 
-    test('"Limpar Canvas" para tudo e apaga o desenho', () => {
+    test('"Limpar Canvas" para tudo e devolve a rede ao repouso', () => {
+        simularLayoutDosNeuronios();
         document.getElementById('botaoIniciar').click();
         jest.advanceTimersByTime(200);
+
+        const animador = TreinamentoRedeNeural.animador;
+        const linha = jest.spyOn(animador.contexto, 'lineTo');
 
         document.getElementById('limparCanvas').click();
 
         expect(TreinamentoRedeNeural.situacao).toBe('parado');
-        expect(TreinamentoRedeNeural.animador.passoAtual).toBeNull();
-        expect(TreinamentoRedeNeural.animador.rodando).toBe(false);
+        expect(animador.passoAtual).toBeNull();
+        expect(animador.rodando).toBe(false);
+        expect(animador.deveAnimarOndas()).toBe(false);
+
+        // A rede volta a ser desenhada parada: o painel nao fica preto.
+        expect(linha.mock.calls.length).toBeGreaterThan(0);
     });
 
-    test('"Testar Conexoes" anima sem treinar', () => {
+    test('"Testar Conexoes" anima sem treinar e para sozinho no fim', () => {
         simularLayoutDosNeuronios();
+        const animador = TreinamentoRedeNeural.animador;
+
         document.getElementById('pintarNeuronio').click();
 
-        const animador = TreinamentoRedeNeural.animador;
+        expect(animador.emDemonstracao).toBe(true);
+        expect(animador.rodando).toBe(true);
         expect(animador.emTreinamento).toBe(false);
         expect(TreinamentoRedeNeural.situacao).toBe('parado');
-        expect(() => animador.desenhar()).not.toThrow();
+        expect(animador.deveAnimarOndas()).toBe(true);
+
+        // Passados os ciclos pedidos, a demonstracao se encerra sozinha.
+        const ciclos = animador.ciclosRestantesDaDemonstracao;
+        for (let i = 0; i < ciclos; i++) { animador.avancar(animador.duracaoCiclo); }
+
+        expect(animador.emDemonstracao).toBe(false);
+        expect(animador.rodando).toBe(false);
+        expect(animador.deveAnimarOndas()).toBe(false);
     });
 
     test('redesenhar a arquitetura recria o canvas e reancora o animador', () => {

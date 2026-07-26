@@ -240,11 +240,14 @@ function treinarRedeNeural(
         aplicarVelocidadeDoPainel();
         prepararGraficosParaAsAmostras(conjunto.entradas.length);
 
+        // A animacao comeca AQUI, junto com o treinamento -- nunca antes.
         if (TreinamentoRedeNeural.animador) {
             TreinamentoRedeNeural.animador.limpar();
             TreinamentoRedeNeural.animador.atualizarGeometria();
             TreinamentoRedeNeural.animador.emTreinamento = true;
-            TreinamentoRedeNeural.animador.iniciar();
+            if (TreinamentoRedeNeural.animador.ligado) {
+                TreinamentoRedeNeural.animador.iniciar();
+            }
         }
 
         TreinamentoRedeNeural.situacao = 'treinando';
@@ -417,13 +420,22 @@ function pararTreinamento() {
 }
 
 function pausarOuRetomarTreinamento() {
+
+    var animador = TreinamentoRedeNeural.animador;
+
     if (TreinamentoRedeNeural.situacao === 'treinando') {
         limparTemporizador();
         TreinamentoRedeNeural.situacao = 'pausado';
+        // Pausado significa parado: a animacao congela junto, senao os pulsos
+        // continuariam correndo pela rede sem nenhum calculo acontecendo.
+        if (animador) { animador.parar(); }
+
     } else if (TreinamentoRedeNeural.situacao === 'pausado') {
         TreinamentoRedeNeural.situacao = 'treinando';
+        if (animador && animador.ligado) { animador.iniciar(); }
         agendarProximoLote();
     }
+
     atualizarBotoesDeControle();
 }
 
